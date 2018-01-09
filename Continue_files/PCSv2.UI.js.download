@@ -1,0 +1,838 @@
+// Copyright (c) 2006 Microsoft Corporation
+var PCS=new Object();PCS.DEFAULT_MKT="en-us";PCS.LastTimeSelectedCardType="";PCS.IsInicisEvent={LastTimeEvent:null,CurrentEvent:null};PCS.EditableFieldSeletor='input[type="text"]:visible, input[type="text"]:enabled, select:visible, #PIInfo input[type="radio"]:checked, #PIInfo input[type="hidden"][id^="creditCard"], #PIInfo input[type="hidden"][id^="billing"]';PCS.PostMessage={SendMessage:function(jsonData,host){PCSSender.SendMessage(jsonData,host);},
+NotifyOnSubmit:function(){document.onkeydown=null;var pmData=eval("("+POST_MESSAGE_MODEL_SUBMITING_JSON+")");if(pmData!=null||pmData!=undefined){PCS.PostMessage.SendMessage(JSON.stringify(pmData),pmData.host);return;}
+},
+NotifyOnPageLoad:function(){if(typeof(POST_MESSAGE_MODEL_JSON_PAGE_RENDERED)=="undefined"
+||POST_MESSAGE_MODEL_JSON_PAGE_RENDERED==null
+||POST_MESSAGE_MODEL_JSON_PAGE_RENDERED==""){return;}
+var pmData=eval("("+POST_MESSAGE_MODEL_JSON_PAGE_RENDERED+")");if(pmData!=null||pmData!=undefined){PCS.PostMessage.SendMessage(JSON.stringify(pmData),pmData.host);return;}
+},
+NotifyOnLink:function(){var pmData=eval("("+POST_MESSAGE_MODEL_JSON+")");if(pmData==null||pmData==undefined)
+return;$('a[target="_blank"]').click(function(){var url=$(this).attr('href');var dataObj=new Object();dataObj.method="pcs_onnavigationrequired";dataObj.redirecturl=url;dataObj.ispostmessage="true";PCS.PostMessage.SendMessage(JSON.stringify(dataObj),pmData.host);});}
+};(function($){$.fn.scrollablePanel=function(options){var settings={increment:50,duration:200};return this.each(function(){if(options){$.extend(settings,options);}
+var $this=$(this);var panel=$this.find(".consent-inner-content");var content=$this.find(".consent-content");var downButton=$this.find("#consentScrollbarDown");var upButton=$this.find("#consentScrollbarUp");panel.css('top',0);var c_len=panel.height();var p_len=content.height();var offset=0;if(c_len>p_len){var maxOffset=c_len-p_len;downButton.show();upButton.show();downButton.live('click',function(){offset=offset-settings.increment;if(-offset>maxOffset){offset=-maxOffset;}
+panel.animate({top:offset},settings.duration);return false;});upButton.live('click',function(){offset=offset+settings.increment;if(offset>0){offset=0;}
+panel.animate({top:offset},settings.duration);return false;});}else{downButton.hide();upButton.hide();}
+});};})(jQuery);(function($){$.tools=$.tools||{version:'@VERSION'};$.tools.tooltip={conf:{effect:'toggle',
+fadeOutSpeed:"fast",
+predelay:0,
+delay:30,
+opacity:1,
+tip:0,
+position:['bottom','right'],
+offset:[0,0],
+relative:false,
+cancelDefault:true,
+events:{def:"mouseenter, mouseleave, focus, focusout",
+input:"focus, blur, click, focusout",
+widget:"focus mouseenter, blur mouseleave",
+tooltip:"mouseenter, mouseleave, focus, focusout"
+},
+layout:'<div/>',
+tipClass:'tooltip'
+},
+addEffect:function(name,loadFn,hideFn){effects[name]=[loadFn,hideFn];}
+};var effects={toggle:[
+function(done){var conf=this.getConf(),tip=this.getTip(),o=conf.opacity;if(o<1){tip.css({opacity:o});}
+tip.show();done.call();},
+function(done){this.getTip().hide();done.call();}
+],
+fade:[
+function(done){var conf=this.getConf();this.getTip().fadeTo(conf.fadeInSpeed,conf.opacity,done);},
+function(done){this.getTip().fadeOut(this.getConf().fadeOutSpeed,done);}
+]
+};/* calculate tip position relative to the trigger */
+function getPosition(trigger,tip,conf){var top=conf.relative?trigger.position().top:trigger.offset().top,
+left=conf.relative?trigger.position().left:trigger.offset().left,
+pos=conf.position[0];top-=tip.outerHeight()-conf.offset[0];left+=trigger.outerWidth()+conf.offset[1];if(/iPad/i.test(navigator.userAgent)){top-=$(window).scrollTop();}
+var height=tip.outerHeight()+trigger.outerHeight();if(pos=='center'){top+=height/2;}
+if(pos=='bottom'){top+=height;}
+pos=conf.position[1];var width=tip.outerWidth()+trigger.outerWidth();if(pos=='center'){left-=width/2;}
+if(pos=='left'){left-=width;}
+var minMargin=8;var pageContainer=$("#mainContent");var pageLeft=pageContainer.offset().left;left=left<pageLeft?pageLeft+minMargin:left;left=(left+tip.outerWidth()+minMargin>pageLeft+pageContainer.outerWidth())?(pageLeft+pageContainer.outerWidth()-tip.outerWidth()-minMargin):left;return{top:top,left:left};}
+function Tooltip(trigger,conf){var self=this,
+fire=trigger.add(self),
+tip,
+timer=0,
+pretimer=0,
+title=trigger.attr("title"),
+tipAttr=trigger.attr("data-tooltip"),
+effect=effects[conf.effect],
+shown,
+isInput=trigger.is(":input"),
+isWidget=isInput&&trigger.is(":checkbox, :radio, select, :button, :submit"),
+type=trigger.attr("type"),
+evt=conf.events[type]||conf.events[isInput?(isWidget?'widget':'input'):'def'];if(!effect){throw "Nonexistent effect \""+conf.effect+"\"";}
+evt=evt.split(/,\s*/);if(evt.length!=4){throw "Tooltip: bad events configuration for "+type;}
+trigger.bind(evt[0],function(e){clearTimeout(timer);if(conf.predelay){pretimer=setTimeout(function(){self.show(e);},conf.predelay);}else{self.show(e);}
+}).bind(evt[1],function(e){clearTimeout(pretimer);if(conf.delay){timer=setTimeout(function(){self.hide(e);},conf.delay);}else{self.hide(e);}
+}).bind(evt[2],function(e){clearTimeout(timer);if(conf.predelay){pretimer=setTimeout(function(){if(self.isShown(true)){self.hide(e);}
+else{self.show(e);}
+return false;},
+conf.predelay);}else{if(self.isShown(true)){self.hide(e);}
+else{self.show(e);}
+return false;}
+}).bind(evt[3],function(e){clearTimeout(pretimer);if(conf.delay){timer=setTimeout(function(){self.hide(e);},conf.delay);}else{self.hide(e);}
+});if(title&&conf.cancelDefault){trigger.removeAttr("title");trigger.data("title",title);}
+$.extend(self,{show:function(e){if(!tip){if(tipAttr){tip=$(tipAttr);}else if(conf.tip){tip=$(conf.tip).eq(0);}else if(title){tip=$(conf.layout).addClass(conf.tipClass).appendTo(document.body)
+.hide().append(title);}else{tip=trigger.next();if(!tip.length){tip=trigger.parent().next();}
+}
+if(!tip.length){throw "Cannot find tooltip for "+trigger;}
+}
+if(self.isShown()){return self;}
+tip.stop(true,true);var pos=getPosition(trigger,tip,conf);if(conf.tip){tip.html(trigger.data("title"));}
+e=$.Event()||e;e.type="onBeforeShow";fire.trigger(e,[pos]);if(e.isDefaultPrevented()){return self;}
+pos=getPosition(trigger,tip,conf);tip.css({position:'absolute',top:pos.top,left:pos.left});shown=true;effect[0].call(self,function(){e.type="onShow";shown='full';fire.trigger(e);});var event=conf.events.tooltip.split(/,\s*/);if(!tip.data("__set")){tip.bind(event[0],function(){clearTimeout(timer);clearTimeout(pretimer);});if(event[1]&&!trigger.is("input:not(:checkbox, :radio), textarea")){tip.bind(event[1],function(e){if(e.relatedTarget!=trigger[0]){trigger.trigger(evt[1].split(" ")[0]);}
+});}
+tip.data("__set",true);}
+return self;},
+hide:function(e){if(!tip||!self.isShown()){return self;}
+e=$.Event()||e;e.type="onBeforeHide";fire.trigger(e);if(e.isDefaultPrevented()){return;}
+shown=false;effects[conf.effect][1].call(self,function(){e.type="onHide";fire.trigger(e);});return self;},
+isShown:function(fully){return fully?shown=='full':shown;},
+getConf:function(){return conf;},
+getTip:function(){return tip;},
+getTrigger:function(){return trigger;}
+});$.each("onHide,onBeforeShow,onShow,onBeforeHide".split(","),function(i,name){if($.isFunction(conf[name])){$(self).bind(name,conf[name]);}
+self[name]=function(fn){if(fn){$(self).bind(name,fn);}
+return self;};});}
+$.fn.tooltip=function(conf){var api=this.data("tooltip");if(api){return api;}
+conf=$.extend(true,{},$.tools.tooltip.conf,conf);if(typeof conf.position=='string'){conf.position=conf.position.split(/,?\s/);}
+this.each(function(){api=new Tooltip($(this),conf);$(this).data("tooltip",api);});return conf.api?api:this;};})(jQuery);(function($){$.fn.Dropdownlist=function(options){var settings={};return this.each(function(){if(options){$.extend(settings,options);}
+var keyName={Tab:9,Enter:13,Up:38,Down:40,Left:37,Right:39};var defaultHeight=$(this).height();var $this=$(this);$this.attr("tabindex","0");$this.find("div.rightarrow").addClass("ddlflag");var delay;$this.bind({focusin:function(){var ul=$(this).find('ul:visible');var li=ul.find('li');var item=li.length;var hoverHeight=ul.height();var isRoll=item*li.outerHeight(true)>hoverHeight;var i=0;$(this).keydown(function(event){var top=ul.scrollTop();switch(event.keyCode){case keyName.Up:{if(i<=item-1&&i>0){li.removeClass('select').eq(--i).addClass('select');}
+if(isRoll)
+ul.scrollTop(top-li.outerHeight(true));return false;}
+case keyName.Down:{if(i<item-1&&i>=0){li.removeClass('select').eq(++i).addClass('select');}
+if(isRoll)
+ul.scrollTop(top+li.outerHeight(true));return false;}
+case keyName.Enter:{if(!$this.hasClass("hover")){$this.removeAttr("tabindex").click();li.eq(i).addClass("select");}
+else{$(this).find(':input').first().val(li.eq(i).data('value'));if(li.eq(i).data('value1')!="undefined")
+$(this).find(':input').eq(1).val(li.eq(i).data('value1'));if(options){$("#"+settings.id).val(li.eq(i).data('value'));$('label[for='+settings.id+']').hide();}
+li.addClass("hidden other").removeClass("select selected").eq(i).removeClass('hidden other select').addClass("selected");$(this).triggerHandler("focusout");}
+return false;}
+case keyName.Tab:{li.removeClass('select');$(this).triggerHandler("focusout");return true;}
+case keyName.Left:{var ancestor=$(this).closest("table").find(".ddlflag").parent();var index=ancestor.index($(this));if(index>0&&index<=ancestor.length)
+{li.removeClass('select');ancestor.eq(--index).focus();}
+return false;}
+case keyName.Right:{var ancestor=$(this).closest("table").find(".ddlflag").parent();var index=ancestor.index($(this));if(index>=0&&index<ancestor.length)
+{li.removeClass('select');ancestor.eq(++index).focus();}
+return false;}
+default:return false;}
+});return false;},
+focusout:function(){$(this).attr("tabindex","0");$(this).children('ul.items').children('li.other').addClass('hidden');$(this).removeClass('hover');$(this).children('div:first-child').removeClass('downarrow').addClass('rightarrow');$(this).unbind("keydown");},
+click:function(){if(!$this.hasClass("hover")){clearTimeout(delay);$this.removeAttr("index");$this.children("ul.items").children("li").removeClass("select");$this.find("li").removeClass("hidden");if(!$this.hasClass("hover")){$this.addClass('hover').scrollTop(0);}
+var item=$this.find('li').length;var hoverHeight=$this.height();var isRoll=item*$this.find('li').outerHeight(true)>hoverHeight;if(!isRoll){$this.css('height','auto').css('min-height',defaultHeight);}
+$this.children('div:first-child').addClass('downarrow').removeClass('rightarrow');}
+}
+});$this.hover(
+function(){delay=setTimeout(function(){$this.click();},150);},
+function(){clearTimeout(delay);$this.focusout();}
+);$(this).scroll(function(){});$this.find("li").bind("click",function(){if($this.hasClass("hover"))
+{$(this).siblings().addClass("hidden other").removeClass("selected");$(this).removeClass("hidden other").addClass("selected");if(options){$("#"+settings.id).val($(this).data('value'));$('label[for='+settings.id+']').hide();}
+$(this).parent().next().filter('input[type=\'hidden\']').eq(0).val($(this).data('value'));if($(this).data('value1')!="undefined")
+$(this).parent().nextAll().filter('input[type=\'hidden\']').eq(1).val($(this).data('value1'));$this.removeClass('hover').find('div:first-child').addClass('rightarrow').removeClass('downarrow');$this.attr("tabindex","0");}
+else
+{$this.click();}
+return false;});});};})(jQuery);(function($){$.fn.MBUXDropdownlist=function(options){var settings={};return this.each(function(){if(options){$.extend(settings,options);}
+var keyName={Tab:9,Enter:13,Up:38,Down:40,Left:37,Right:39};var defaultHeight=$(this).height();var $this=$(this);$this.attr("tabindex","0");var delay;$this.bind({focusin:function(){var li=$(this).find('li');var item=li.length;var hoverHeight=$(this).height();var isRoll=item*li.outerHeight(true)>hoverHeight;var i=0;$(this).keydown(function(event){var top=$this.children(".item:first").scrollTop();switch(event.keyCode){case keyName.Up:
+{if(i<=item-1&&i>0){li.removeClass('highlighting').eq(--i).addClass('highlighting');}
+if(isRoll)
+$this.children(".item:first").scrollTop(top-li.outerHeight(true));return false;}
+case keyName.Down:
+{if(i<item-1&&i>=0){li.removeClass('highlighting').eq(++i).addClass('highlighting');}
+if(isRoll)
+$this.children(".item:first").scrollTop(top+li.outerHeight(true));return false;}
+case keyName.Enter:
+{if(!$this.hasClass("expand")){$this.click();}else{SetValue(li.eq(i).attr('datavalue'),li.eq(i).text());li.eq(i).click();Close();}
+return false;}
+case keyName.Tab:
+{$(this).triggerHandler("focusout");return true;}
+case keyName.Left:
+{return false;}
+case keyName.Right:
+{return false;}
+default:return false;}
+});return false;},
+focusout:function(){$(this).attr("tabindex","0");$(this).unbind("keydown");Close();},
+click:function(){Open();}
+});$(this).scroll(function(){});$(this).find("li").bind("click",function(){SetValue($(this).attr('datavalue'),$(this).text());Close();return false;});var GetValue=function(){return $this.next(":input").val();};var SetValue=function(val,txt){$this.next(":input").val(val);$this.children("label:first").text(txt);};var Open=function(){if(!$this.hasClass("expand")){$this.addClass("expand");$this.find("li[datavalue='"+GetValue()+"']").addClass("selected");$this.attr("tabindex","0");}
+};var Close=function(){var currentVal=GetValue();$this.find("li").removeClass("highlighting").removeClass("selected");$this.removeClass("expand");$this.attr("tabindex","0");$(this).triggerHandler("focusout");};});};})(jQuery);var Popup={CookieName:"PCSContsentAgree",
+PopupID:null,
+ShadeID:null,
+ISShow:false,
+NeedShowNormalConsent:false,
+CancelUrl:null,
+Hide:function(){Popup.ISShow=false;$("#"+Popup.PopupID).hide();$("#"+Popup.ShadeID).hide();},
+IsAgree:function(param){var cookie=new PCS.Cookies();var agree=cookie.Get(Popup.CookieName);var paramValue=GetQueryString(param);cookie=null;if(agree!=null&&agree!=""){if(paramValue==null||paramValue==""){if(param=='mkt'){paramValue=PCS.DEFAULT_MKT;}
+}
+if(paramValue!=null&&paramValue!=""&&agree.indexOf(paramValue)!=-1){return true;}
+}
+return false;},
+KeyDownEvent:function(e){var e=e||window.event;var key=window.event?e.keyCode:e.which;if(key==9){if(document.activeElement.id=="PopupConsentOK"){document.getElementById("PopupConsentCancel").focus();}else{document.getElementById("PopupConsentOK").focus();}
+return false;}
+},
+Show:function(popupid,shadeid,cookieKey){if(Popup.IsAgree(cookieKey)){return;}
+this.PopupID=popupid;this.ShadeID=shadeid;popupid="#"+popupid;shadeid="#"+shadeid;var windowHeight=$(window).height();var windowWidth=$(document.body).width();var mainContentHeight=$('#mainContent').height();windowHeight=(windowHeight>mainContentHeight)?mainContentHeight:windowHeight;var popupHeight=$(popupid).height();var popupWidth=$(popupid).width();if(windowHeight<popupHeight){windowHeight=popupHeight;}
+var leftPos=windowWidth>popupWidth?(windowWidth-popupWidth)/2:0;var topPos=windowHeight>popupHeight?(windowHeight-popupHeight)/2:0;$(popupid).css("top",topPos+"px");$(popupid).css("left",leftPos+"px");$(shadeid).width($(document).width());$(shadeid).height($(document).height());PCS.Views.putAccountTypeViews();if(cookieKey=="dupm"){$("#PopupControl").append(PCS.Views.getViewById("ConsentContentForAgent"));}else{$("#PopupControl").append(PCS.Views.getViewById("ConsentContent"));}
+$(shadeid).show();$(popupid).show();Popup.ISShow=true;document.onkeydown=Popup.KeyDownEvent;},
+OKClick:function(paramKey){var paramValue=GetQueryString(paramKey);if(paramValue==null){if(paramKey=="mkt"){paramValue=PCS.DEFAULT_MKT;}
+}
+var cookie=new PCS.Cookies();var agree=cookie.Get(Popup.CookieName);if(agree==null||agree==""){agree="|"+paramValue+"|";}else{if(agree.indexOf(paramValue)==-1){agree+=paramValue+"|";}
+}
+if(Popup.NeedShowNormalConsent&&paramKey=="dupm"){cookie.Add(Popup.CookieName,agree,null,null,null);Popup.CookieName="PCSContsentAgreeMkt";Popup.Show(this.PopupID,this.ShadeID,"mkt");Popup.NeedShowNormalConsent=false;$("#PopupConsentOK").bind("click",function(){Popup.OKClick("mkt")});}else{Popup.Hide();cookie.Add(Popup.CookieName,agree,null,null,null);cookie=null;document.onkeydown=null;}
+},
+CancelClick:function(){document.onkeydown=null;var pmData=eval("("+POST_MESSAGE_MODEL_JSON+")");if(pmData!=null||pmData!=undefined){if(pmData.ispostmessage.toLowerCase()=="true"){pmData.method="pcs_onerror";pmData.errorcode="11";pmData.redirecturl=Popup.CancelUrl;PCS.PostMessage.SendMessage(JSON.stringify(pmData),pmData.host);return;}
+}
+location.href=Popup.CancelUrl;}
+}
+var StepTitleToggleCollapse={ExpandImgUrl:null,
+CollapseImgUrl:null,
+Init:function(){$(".font-section-title").click(StepTitleToggleCollapse.ToggleCollapse);},
+ToggleCollapse:function(){var img=$(this).children("img").first();var container=$(this).next().first();if($(container).css("display")==""||$(container).css("display")=="block"){$(img).attr("src",StepTitleToggleCollapse.CollapseImgUrl);$(container).hide();}else{$(img).attr("src",StepTitleToggleCollapse.ExpandImgUrl);$(container).show();}
+PageHeightChangeNotice();}
+}
+var ViewMode={ModeType:0,
+Init:function(modeType){this.ModeType=parseInt(modeType);switch(this.ModeType){case 1:
+this.Hide(this.View1_Tit1_PIList_Tit2);break;case 2:
+this.Hide(this.View2_Tit1_PIList_Tit2_Btns);break;case 3:
+this.Hide(this.View3_ExistingPI);this.InputDisabled(this.View3_ExistingPI);break;case 4:
+this.Hide(this.View4_Tit1_PIList);break;default:
+break;}
+},
+View1_Tit1_PIList_Tit2:["#ChoosePITitle","#ChoosePIChildTitle","#PIList","#PIDetailTitle"],
+View2_Tit1_PIList_Tit2_Btns:["#ChoosePITitle","#ChoosePIChildTitle","#PIList","#PIDetailTitle","#btnSave","#btnReset"],
+View3_ExistingPI:["#ExistingPI"],
+View4_Tit1_PIList:["#selectCountryDiv","#ChoosePITitle","#ChoosePIChildTitle","#PIList"],
+Hide:function(hideIdList){if(typeof(hideIdList)=="undefined"||hideIdList.length<=0){return;}
+for(var i=0;i<hideIdList.length;i++){$(hideIdList[i]).hide();}
+},
+InputDisabled:function(hideIdList){if(typeof(hideIdList)=="undefined"||hideIdList.length<=0){return;}
+for(var i=0;i<hideIdList.length;i++){$(hideIdList[i]+" input").prop("disabled",true);}
+}
+}
+var InputHint={HINT_ID_LIST:new Array(),
+HintInit:function(idlist){this.HINT_ID_LIST=idlist;for(var i=0;i<idlist.length;i++){var id=idlist[i];$(this.GetHintDiv(id)).bind("click",{elementID:id},InputHint.HintClick);$("#"+id).bind("focus",InputHint.HintFocus);$("#"+id).bind("blur",InputHint.HintBlur);if($("#"+id).val()!=""||$("#"+id).val().length>0){$(this.GetHintDiv(id)).hide();}
+}
+},
+GetHintDiv:function(id){if($("#"+id+" ~ div[class*='hint']").length>1){return $("#"+id+" ~ div[class*='hint'][forid='"+id+"']");}
+return $("#"+id+" ~ div[class*='hint']").first();},
+HintClick:function(event){$(this).hide();var id="#"+event.data.elementID;setTimeout(function(){$(id).focus();},50);},
+HintFocus:function(event){$(InputHint.GetHintDiv(this.id)).hide();},
+HintBlur:function(event){if(this.value==""||this.value.length<=0){$(InputHint.GetHintDiv(this.id)).show();}
+}
+}
+var ValidateResult={VALIDATERESULT_PI_ID:null,
+ValidateResultInit:function(idlist,piid){if(this.VALIDATERESULT_PI_ID==null){this.VALIDATERESULT_PI_ID=(piid==null||piid=='')?$("input[name=pcs_spiid]:radio").val():piid;}
+if(this.VALIDATERESULT_PI_ID==null||
+this.VALIDATERESULT_PI_ID==''||
+this.VALIDATERESULT_PI_ID==piid){for(var i=0;i<idlist.length;i++){var editField=$("#"+idlist[i]);if(editField.parent().not('.cc_dd_width').is('div.dropdownlist')){editField=editField.parent();}
+editField.addClass("input-err");editField.blur(ValidateResult.ValidateResultClear);}
+}
+},
+ValidateResultClear:function(){$(this).removeClass("input-err");}
+}
+function DropdownListClickForBAM(){$(".dropdownlist").Dropdownlist();$("#pi-addr ul.items li").bind("click",function(){var liData=$(this).data('value');var billingState=$("#billingState");if(billingState.length){billingState.val(liData);}
+var billingCity=$('#billingCityOfHK :input(input[type=hidden])');if(billingCity.length){$("#billingCity").val(liData);}
+return false;});}
+function OnFieldEdit(){if($('form').validate()!=null
+&&$('form').validate().submitted!=null
+&&this.name in $('form').validate().submitted){PageHeightChangeNotice();}
+if(typeof(POST_MESSAGE_MODEL_FIELD_CHANGE)=='undefined'||!POST_MESSAGE_MODEL_FIELD_CHANGE
+||typeof(POST_MESSAGE_MODEL_FIELD_CHANGE_IDS)=='undefined'||!POST_MESSAGE_MODEL_FIELD_CHANGE_IDS){return;}
+var pmData=eval("("+POST_MESSAGE_MODEL_FIELD_CHANGE+")");if(pmData&&pmData.ispostmessage.toLowerCase()=="true"){if(pmData.method==="pcs_onfieldchangenotify"
+&&jQuery.inArray(this.id,POST_MESSAGE_MODEL_FIELD_CHANGE_IDS.split(","))!==-1){pmData.updatedinputid=this.id;pmData.updatedinputvalue=this.value;if(typeof(POST_MESSAGE_MODEL_FIELD_CHANGE_ATTR_ID)!='undefined'
+&&POST_MESSAGE_MODEL_FIELD_CHANGE_ATTR_ID
+&&typeof($('option:selected',this).attr(POST_MESSAGE_MODEL_FIELD_CHANGE_ATTR_ID))!='undefined'){pmData.updatedinputvalue=$('option:selected',this).attr(POST_MESSAGE_MODEL_FIELD_CHANGE_ATTR_ID);}
+PCSSender.SendMessage(JSON.stringify(pmData),pmData.host);}
+}
+}
+function IsEmptyObject(obj){for(var prop in obj){return false;}
+return true;};PCS.Views={putViewById:function(id,view){this[id]=view;},
+getViewById:function(id){var view=this[id];delete this[id];return view;},
+putAccountDetialInfoViews:function(){$("#AccountDetailInfo").children("div").each(function(){PCS.Views.putViewById(this.id,this);$(this).detach();});},
+putAllViews:function(){$("#PIDetailTitle, #pi-card, #pi-addr, #pi-sepa, #piNote, #divBillingState, #AccountDetailInfo").children("div").each(function(){PCS.Views.putViewById(this.id,this);$(this).detach();});},
+putBankPayViews:function(){$("#accountCPFAndCNPJLabel").children("div").each(function(){PCS.Views.putViewById(this.id,this);$(this).detach();});},
+putACHAuthAgreementViews:function(){$("#ACHAuthAgreementDiv").children("div").each(function(){PCS.Views.putViewById(this.id,this);$(this).detach();});},
+putAccountTypeViews:function(){$("#AccountDetailInfoPobo, #PopupControl").children("div").each(function(){PCS.Views.putViewById(this.id,this);$(this).detach();});},
+prefillPage:function(category,cardtype,dataObject,subtype){RefreshUIOnSelectedPI(cardtype,category,subtype);if(dataObject==null)return;if(category==null||category.toLowerCase()!="new"){$("#pi-card input, #pi-card select, #pi-addr input, #pi-addr select, #pi-extra input, #pi-sepa input, #pi-sepa select, #pi-sepa textarea").each(function(){if($(this).is(":radio")){$(this).prop("checked",this.value==dataObject[this.name]);}else{ExpiredYearSelect($(this),dataObject[this.id],cardtype,category);$(this).val(dataObject[this.id]);}
+});if(cardtype=="cc"&&isUsedCustomizedDropdownlist){ExpiredYearSelectBam($("ul#creditCardExpireYear"),dataObject['creditCardExpireYear']);}
+$("#pi-card ul.items li, #pi-extra ul.items li").each(function(){var $this=$(this);var elementID=$this.parent().siblings('input[type=\'hidden\']')[0].id;if($this.data('value')==dataObject[elementID]){$this.siblings().addClass('hidden').addClass('other');$this.removeClass('hidden').removeClass('other');}
+});$("#pi-card .readonly-field, #pi-addr .readonly-field, #pi-sepa .readonly-field, #pi-extra .readonly-field").each(function(){if($(this).is(":radio")){$(this).prop("checked",this.value==dataObject[this.name]);}else{if(dataObject[this.id]&&this.id=="bapType"){switch(dataObject[this.id].toLowerCase()){case "checking":
+$(this).html(bapTypeChecking);break;case "savings":
+$(this).html(bapTypeSavings);break;}
+}else if(dataObject[this.id]&&this.id=="isCorporate"){switch(dataObject[this.id].toLowerCase()){case "0":
+$(this).html(bapTypeIndividual);break;case "1":
+$(this).html(bapTypeCorporate);break;}
+}else if(dataObject[this.id]&&this.id=="isResident"){switch(dataObject[this.id].toLowerCase()){case "0":
+$(this).html(bapTypeNonResident);break;case "1":
+$(this).html(bapTypeResident);break;}
+}
+else{$(this).html(dataObject[this.id]);}
+}
+});if(CREDIT_CARD_TYPE_DISPLAY_MODE_FOR_EDIT.toLowerCase()!="text"){var cardType=dataObject["creditCardType"];if(CREDIT_CARD_TYPE_DISPLAY_MODE_FOR_EDIT.toLowerCase()=="imagehidden"){$("#CreditCardTypeList label").hide();$("#CreditCardTypeList label img[cardtype='"+cardType+"']").parent().show();}else{$("#CreditCardTypeList label img").each(function(){if($(this).attr("cardtype")==cardType){$(this).attr("src",$(this).attr("normalsrc"));}else{$(this).attr("src",$(this).attr("graysrc"));}
+});}
+}
+}else if(category.toLowerCase()=="new"){$("#pi-addr input, #pi-extra input").each(function(){if($(this).is(":radio")){$(this).prop("checked",this.value==dataObject[this.name]);}else{$(this).val(dataObject[this.id]);}
+});$("#pi-addr .readonly-field, #pi-extra .readonly-field").each(function(){if($(this).is(":radio")){$(this).prop("checked",this.value==dataObject[this.name]);}else{$(this).html(dataObject[this.id]);}
+});}
+$("#pi-addr ul.items li").each(function(){var $this=$(this);var elements=new Array();elements[0]='billingState';elements[1]='billingCity';for(var i=0;i<elements.length;i++){var datavalue=dataObject[elements[i]];if(datavalue!=null&&datavalue!='')
+{if($this.data('value')==datavalue){$this.siblings().addClass('hidden').addClass('other');$this.removeClass('hidden').removeClass('other');}
+}
+}
+});$("#pi-addr input").each(function(){if($(this).is(":radio"))
+$(this).prop("checked",this.value==dataObject[this.name]);else{if(cardtype!="bap"||dataObject["isunicode"+this.id]==null||dataObject["isunicode"+this.id]=="0"){if(this.value==""){$(this).val(dataObject[this.id]);}
+else{if(this.value!=dataObject[this.id]){dataObject[this.id]=this.value;if(dataObject["isunicode"+this.id]!=null){dataObject["isunicode"+this.id]="0";}
+}
+}
+}
+else{if(this.value!=dataObject[this.id]){dataObject[this.id]=this.value;if(dataObject["isunicode"+this.id]!=null){dataObject["isunicode"+this.id]="0";}
+}
+$(this).val("");}
+}
+});InputHint.HintInit(INPUT_HINT_LIST);}
+};PCS.CCTypeClick=function(){$("#creditCardNumber").focusout();}
+PCS.BPRadioClick=function(){var $this=$(this);var typeid=$this.attr("id"),
+subtype=$this.attr("subtype");if(typeof(typeid)=="undefined"||typeof(subtype)=="undefined"){return;}
+if(subtype=="account"){PCS.Views.putBankPayViews();}
+switch(typeid){case "bankRadioPayCPFID":
+{$("#"+subtype+"CPFAndCNPJLabel").append(PCS.Views.getViewById(subtype+"-cpf"));$("#CCM").attr("value","").prop("disabled",true).addClass("account-field");$("#lblBillingCCMHint").prop("disabled",true);}
+break;case "bankRadioPayCNPJID":
+{$("#"+subtype+"CPFAndCNPJLabel").append(PCS.Views.getViewById(subtype+"-cnpj"));$("#CCM").prop("disabled",false).removeClass("account-field");$("#lblBillingCCMHint").prop("disabled",false);}
+break;default:
+break;}
+InputHint.HintInit(INPUT_HINT_LIST);}
+PCS.PITypeDropdownClick=function(category,cardtype,subtype,cardid){if(typeof(category)=="undefined"||typeof(cardtype)=="undefined"){return;}
+$("#pcs_spiid").val(cardid);PCS.PITypeClickHandler(category,cardtype,subtype,"false",cardid);}
+PCS.RadioClick=function(){var $this=$(this);var category=$this.attr("category"),
+cardtype=$this.attr("cardtype"),
+subtype=$this.attr("subtype"),
+eSignedMandate=$this.attr("eSignedMandate"),
+cardid=$this.val();if(typeof(category)=="undefined"||typeof(cardtype)=="undefined"){return;}
+PCS.PITypeClickHandler(category,cardtype,subtype,eSignedMandate,cardid);}
+function RefreshAlertOnPage(){setTimeout(function(){$.each($("div[role='alert']:visible"),function(index,item){$(item).html($(item).html());})
+},5000);}
+function AddCCExpiredMsg(){if(isUsedCustomizedDropdownlist){$('.box .dropdownlist').not('.cc_dd_width').addClass("input-err");}
+else{$('#creditCardExpireMonth').addClass("input-err");$('#creditCardExpireYear').addClass("input-err");}
+$('#cc_expiredmsg').removeClass('hidden');}
+function RemoveCCExpiredMsg(){if(isUsedCustomizedDropdownlist){$('.box .dropdownlist').not('.cc_dd_width').removeClass("input-err");}
+else{$('#creditCardExpireMonth').removeClass("input-err");$('#creditCardExpireYear').removeClass("input-err");}
+if($('#cc_expiredmsg').is(':visible')){$('#cc_expiredmsg').addClass('hidden');}
+}
+PCS.PITypeClickHandler=function(category,cardtype,subtype,eSignedMandate,cardid){var carddata=PCS.Cards[cardtype][cardid],
+needcvv='false',
+addr="addr",
+needAddressInfo=PCS.Cards[cardtype].NeedAddressInfo;RefreshAlertOnPage();if(PCS.PageManager){PCS.PageManager.reset();}
+PCS.Views.putAllViews();$("#PIDetailTitle").show();if(cardtype!=null&&cardtype.toLowerCase()=="sv"){$("#PIDetailTitle").append(PCS.Views.getViewById('svPIDetailTitle'));}else{if(category.toLowerCase()=="new"){if(!needAddressInfo&&(subtype=="AAAAAAIPOY"||subtype=="AAAAAAJ39E"||subtype=="AAAAAALITU"||subtype=="AAAAAAQ43M")){$("#PIDetailTitle").append(PCS.Views.getViewById('EmptyTitle'));}else{if(STEP2_TITLE_ADD_Dynamic=="true"){var view=PCS.Views.getViewById(cardtype+'PIDetailTitle');if(view!=null&&view.outerHTML!="")
+$("#PIDetailTitle").append(view);else 
+$("#PIDetailTitle").hide();}else{$("#PIDetailTitle").append(PCS.Views.getViewById('NewPIDetailTitle'));}
+}
+}else{if(cardtype.toLowerCase()=='lwp'&&!needAddressInfo){$("#PIDetailTitle").append(PCS.Views.getViewById('EmptyTitle'));}else if(cardtype.toLowerCase()=='cc'){$("#PIDetailTitle").append(PCS.Views.getViewById('ccEditPIDetailTitle'));}else{$("#PIDetailTitle").append(PCS.Views.getViewById('otherEditPIDetailTitle'));}
+}
+}
+if(cardtype.toLowerCase()=="lwp"){if(category.toLowerCase()=="new"){if(cardid!=null&&cardid.length>0){$("#pi-card").append(PCS.Views.getViewById(cardid));}
+}else{$("#pi-card").append(PCS.Views.getViewById(category+subtype));}
+}
+else{if(cardtype.toLowerCase()=="dd"){var needSEPA=isSEPA;if(category.toLowerCase()!="new"){needSEPA=subtype=="sepa";}
+$("#isSEPA").val(needSEPA);if(needSEPA){if(category.toLowerCase()=="new"){$("#pi-card").append(PCS.Views.getViewById(category+cardtype));$("#pi-sepa").append(PCS.Views.getViewById("newsepa"));}else if(eSignedMandate=="true"){$("#pi-card").append(PCS.Views.getViewById(category+subtype));$("#pi-sepa").append(PCS.Views.getViewById("ro-eSignedMandate-sepa"));}else{$("#pi-card").append(PCS.Views.getViewById(category+subtype));$("#pi-sepa").append(PCS.Views.getViewById("ro-sepa"));}
+}else{$("#pi-card").append(PCS.Views.getViewById(category+cardtype));}
+}else{$("#pi-card").append(PCS.Views.getViewById(category+cardtype));}
+$("#piNote").append(PCS.Views.getViewById(category+cardtype+"note"));}
+if(category.toLowerCase()=="new"){if(needAddressInfo){$("#pi-addr").append(PCS.Views.getViewById("ed"+addr));}
+}
+else{if(needAddressInfo&&cardtype.toLowerCase()!='pp'){$("#pi-addr").append(PCS.Views.getViewById(category+addr));}
+}
+var $thisStateDiv=$("#divBillingState");if(cardtype!=null&&cardtype.toLowerCase()=="bap"){if($thisStateDiv&&needAddressInfo){$thisStateDiv.prepend(PCS.Views.getViewById("bapPITypeStates"));$("#bapPITypeStates").show();$("#otherPITypeStates").hide();}
+}else{if($thisStateDiv&&needAddressInfo){$thisStateDiv.prepend(PCS.Views.getViewById("otherPITypeStates"));$("#otherPITypeStates").show();$("#bapPITypeStates").hide();}
+}
+if(category.toLowerCase()=="new"&&cardtype.toLowerCase()=='cc'){$("#redirectMsg").show();}else{$("#redirectMsg").hide();}
+var isPayOutPI=AccountInfoDisplay(cardtype,category);if(cardid!=PCS.DefaultSelectedPIId){$("#ValidationResultMessage").hide();$('.input-err').each(function(){$(this).removeClass('input-err');});}else{$("#ValidationResultMessage").show();}
+var payinemail=$("#payinaccountemail");var payoutemail=$("#payoutaccountemail");if(isPayOutPI&&payoutemail.length){PCS.Profile['billingEmail']=payoutemail.val();}else if(payinemail.length){PCS.Profile['billingEmail']=payinemail.val();}
+var profile=PCS.Profile;if(category.toLowerCase()=="new"){PCS.Views.prefillPage(category,cardtype,profile,subtype);}
+else{PCS.Views.prefillPage(category,cardtype,carddata,subtype);if(carddata.CVVChallengeOnUpdate&&carddata.CVVChallengeOnUpdate.toLowerCase()=='true'){$('#editcc-cvv-div').show();}
+else{$('#editcc-cvv-div').hide();}
+}
+if(eSignedMandate=="true"){$("#sepaPIId").val(cardid);}
+SetTheDefaultValueForBAMStyleDropdown(cardtype,needAddressInfo);if(cardtype=='bap'){$("#NeedShowASCIIEncodeNote").removeClass('hidden');}else{$("#NeedShowASCIIEncodeNote").addClass('hidden');}
+if($("#PIBrowserMsg").length){if(cardtype=='inicis'){$("#PIBrowserMsg").removeClass('hidden');}else{$("#PIBrowserMsg").addClass('hidden');}
+}
+if(cardtype!=null&&cardtype.toLowerCase()=="sv"){var disclaimLink=$("#disclaimText a")
+if(disclaimLink!=undefined&&disclaimLink!=null){var target=disclaimLink.attr("target");if(typeof target===typeof undefined){disclaimLink.attr("target","_blank");}
+}
+}
+var validator=$("#PCSBodyForm").validate();if(cardtype=='bap'&&isDynamicGroup){validator.groups['billingAddress1']='ValidateLocationAddress';validator.groups['billingAddress2']='ValidateLocationAddress';validator.groups['billingAddress3']='ValidateLocationAddress';validator.groups['billingDistrict']='ValidateLocationAddress';validator.settings.rules["billingAddress1"]["NonCCNumberSuspicious"]=false;validator.settings.rules["billingAddress2"]["NonCCNumberSuspicious"]=false;validator.settings.rules["billingAddress3"]["NonCCNumberSuspicious"]=false;validator.settings.rules["billingDistrict"]["NonCCNumberSuspicious"]=false;}else{validator.groups['billingAddress1']='';validator.groups['billingAddress2']='';validator.groups['billingAddress3']='';validator.groups['billingDistrict']='';validator.settings.rules["billingAddress1"]["NonCCNumberSuspicious"]=true;validator.settings.rules["billingAddress2"]["NonCCNumberSuspicious"]=true;validator.settings.rules["billingAddress3"]["NonCCNumberSuspicious"]=true;validator.settings.rules["billingDistrict"]["NonCCNumberSuspicious"]=true;}
+if(isACH){PCS.Views.putACHAuthAgreementViews();if(cardtype=='dd'){$("#ACHAuthAgreementDiv").append(PCS.Views.getViewById("subAgreementACH"));ACHAuthAgreement(true);}
+}
+if(cardtype=='dd'){$("#ShowDirectDebitMandateInstruction").removeClass('hidden');}else{$("#ShowDirectDebitMandateInstruction").addClass('hidden');}
+if((category.toLowerCase()=="ed")&&(cardtype!=null&&cardtype.toLowerCase()=="cc")){var ccYear=carddata.creditCardExpireYear;var ccMonth=carddata.creditCardExpireMonth;var currentDate=new Date();var currentYear=currentDate.getFullYear();var currentMonth=currentDate.getMonth()+1;if(ccYear<currentYear||(ccYear==currentYear&&ccMonth<currentMonth)){AddCCExpiredMsg();}else{RemoveCCExpiredMsg();}
+}else{if($('#cc_expiredmsg').is(':visible')){$('#cc_expiredmsg').addClass('hidden');}
+}
+$("#selected-pi-type").val(cardtype);$("#selected-pi-category").val(category);$("#pcs_svstype").val("");if(subtype!=undefined&&subtype!=null){$("#selected-pi-subtype").val(subtype);}
+if(cardtype!=null){if(PCS.LastTimeSelectedCardType!=cardtype){if(cardtype.toLowerCase()=="inicis"&&PCS.IsInicisEvent.CurrentEvent!=null){PCS.IsInicisEvent.CurrentEvent=PCS.IsInicisEvent.CurrentEvent.replace("{0}",cardtype);PCS.IsInicisEvent.CurrentEvent=PCS.IsInicisEvent.CurrentEvent.replace("{1}",category);eval(PCS.IsInicisEvent.CurrentEvent);}
+if(PCS.LastTimeSelectedCardType.toLowerCase()=="inicis"&&PCS.IsInicisEvent.LastTimeEvent!=null){PCS.IsInicisEvent.LastTimeEvent=PCS.IsInicisEvent.LastTimeEvent.replace("{0}",cardtype);PCS.IsInicisEvent.LastTimeEvent=PCS.IsInicisEvent.LastTimeEvent.replace("{1}",category);eval(PCS.IsInicisEvent.LastTimeEvent);}
+}
+}
+if(isNoPermission){$("#pi-card").append(PCS.Views.getViewById("challengePermissionDiv"));$("#btnSave").prop('disabled',true);return;}else{$("#btnSave").prop('disabled',false);}
+if(PARTNER!="mbux"){$("#pagefooter").show();}
+if($("#btnSave").is(":disabled")){$("#btnSave").prop('disabled',false);}
+$("#cvvresult").html("");if(isSEPA)
+{var yourPaymetnInputs=$("#directDebitNumber, #directDebitBankCode, #directDebitHolderName");var yourPaymentOutputDic={"directDebitNumber":"iBANNumber",
+"directDebitBankCode":"swiftBIC",
+"directDebitHolderName":"accountName"
+};var typingTimer;var doneTypingInterval=100;yourPaymetnInputs.each(function(idx,item){$(this).bind('focusout',function(){clearTimeout(typingTimer);var itemValue=item.value;var itemID=item.id;if(itemValue.length>0){typingTimer=setTimeout(function(){var outputItemID=yourPaymentOutputDic[itemID];$("#"+outputItemID).val(itemValue);},doneTypingInterval);}
+});});if(HasPayinAccount)
+{PCS.FillSEPAAccountInfo(PCS.YourInfoProfile);}
+if($("#pi-extra").is(":visible"))
+{var yourAccountInputs=$("#billingAddress1, #billingAddress2, #billingAddress3, #billingCity, #billingState, #billingZipcode, #billingDistrict");var yourAccountOutputDic={"billingAddress1":"sepaAddress1",
+"billingAddress2":"sepaAddress2",
+"billingAddress3":"sepaAddress3",
+"billingDistrict":"sepaDistrict",
+"billingCity":"signingCity",
+"billingState":"signingState",
+"billingZipcode":"signingZipcode"
+};yourAccountInputs.each(function(idx,item){$(this).bind('focusout',function(){clearTimeout(typingTimer);var itemValue=item.value;var itemID=item.id;if(itemValue.length>0){typingTimer=setTimeout(function(){var outputItemID=yourAccountOutputDic[itemID];$("#"+outputItemID).val(itemValue);},doneTypingInterval);}
+});});$("#FirstName, #LastName, #CompanyName").each(function(idx,item){$(this).bind('focusout',function(){clearTimeout(typingTimer);var yourName=$("#FirstName").val();var lastName=$("#LastName").val();if(lastName!=undefined&&lastName!=null&&lastName.length>0)
+{yourName+=" "+lastName;}
+var companyName=$("#CompanyName").val();if(companyName!=undefined&&companyName!=null&&companyName.length>0)
+{yourName=companyName;}
+if(yourName!=undefined&&yourName!=null&&yourName.length>0){typingTimer=setTimeout(function(){$("#name").val(yourName);},doneTypingInterval);}
+});});}
+}
+PCS.LastTimeSelectedCardType=cardtype;setTimeout("PageHeightChangeNotice();",200);ReorderTabindex();if((piuserType.toLowerCase()=="business"||piuserType.toLowerCase()=="corporate")&&needShowCPFAndCNPJAndCCM!=undefined&&needShowCPFAndCNPJAndCCM!=""){if(needShowCPFAndCNPJAndCCM.toLowerCase()=="showcpf"||($.inArray("CPF",INPUT_INVOLVEDELEMENT_LIST))!=-1){$("#bankRadioPayCPFID").trigger("click");}
+else{$("#bankRadioPayCNPJID").trigger("click");}
+}
+ValidateResult.ValidateResultInit(INPUT_INVOLVEDELEMENT_LIST,cardid);if(!notUseDeadPageForInicisPay){if(category=="new"&&cardtype=="inicis"){$("#pi-addr").hide();$("#pi-extra").hide();$("#btnSave").hide();}else{$("#pi-addr").show();$("#btnSave").show();AccountInfoDisplay(cardtype,category);}
+}
+if(PCS.PageManager){PCS.PageManager.regenerate();PCS.PageManager.apply();}
+}
+PCS.EachEvent=function(){if(this.value==PCS.DefaultSelectedPIId){var $this=$(this);var category=$this.attr("category"),
+cardtype=$this.attr("cardtype");subtype=$this.attr("subtype"),
+$(this).trigger("click");$(this).prop('checked',true);if(PCS.RequestForm!=undefined){PCS.Views.prefillPage(null,cardtype,PCS.RequestForm,subtype);}
+return false;}
+}
+PCS.PopulateProfile=function(dataObject){if(dataObject==null){return;}
+$("#act-addr input, #act-addr select, #act-extra input, #act-extra select").each(function(){if($(this).is(":radio"))
+$(this).prop("checked",this.value==dataObject[this.name]);else 
+$(this).val(dataObject[this.id]);});$("#act-addr .readonly-field, #act-extra .readonly-field").each(function(){if($(this).is(":radio"))
+$(this).prop("checked",this.value==dataObject[this.name]);else 
+$(this).text(dataObject[this.id]);});FillAcountCPFAndCNPJ(dataObject);}
+PCS.FillAccountInfo=function(dataObj){if(dataObj==null)return;$("#pi-addr input, #pi-addr select, #pi-extra input").each(function(){if($(this).is(":radio"))$(this).prop("checked",this.value==PCS.Profile[this.name]);else $(this).val(PCS.Profile[this.id]);});$("#pi-addr .readonly-field, #pi-extra .readonly-field").each(function(){if($(this).is(":radio"))$(this).prop("checked",this.value==PCS.Profile[this.name]);else $(this).text(PCS.Profile[this.id]);});FillAcountCPFAndCNPJ(dataObj);}
+PCS.FillSEPAAccountInfo=function(dataObj){if(dataObj==null)return;$("#roYourPaymentInformation input").each(function(){if($(this).is(":radio"))$(this).prop("checked",this.value==PCS.YourInfoProfile[this.name]);else $(this).val(PCS.YourInfoProfile[this.id]);});$("#roYourPaymentInformation .readonly-field").each(function(){if($(this).is(":radio"))$(this).prop("checked",this.value==PCS.YourInfoProfile[this.name]);else $(this).text(PCS.YourInfoProfile[this.id]);});}
+function SetTheDefaultValueForBAMStyleDropdown(cardtype,needAddressInfo)
+{var billingState=$("#billingState");var billingCity=$('#billingCityOfHK :input(input[type=hidden])');var otherPITypeStates=$("#otherPITypeStatesHiddenli");var bapPITypeStates=$("#bapPITypeStatesHiddenli");if(cardtype!=null&&cardtype.toLowerCase()=="bap"){if(needAddressInfo){var bapData="";if(bapPITypeStates&&bapPITypeStates.length>0){bapData=bapPITypeStates.data('value');if(billingState&&billingState.length>0&&billingState.val()==''){billingState.val(bapData);}
+if(billingCity&&billingCity.length>0&&billingCity.val()==''){$('#billingCity').val(bapData)
+}
+}
+}
+}else{if(needAddressInfo){var otherData="";if(otherPITypeStates&&otherPITypeStates.length>0){otherData=otherPITypeStates.data('value');if(billingState&&billingState.length>0&&billingState.val()==''){billingState.val(otherData);}
+if(billingCity&&billingCity.length>0&&billingCity.val()==''){$('#billingCity').val(otherData)
+}
+}
+}
+}
+}
+function FillAcountCPFAndCNPJ(dataObj)
+{if((dataObj["CPF"]!=undefined)&&$("#CPF").attr("subtype")!=undefined&&$("#CPF").attr("subtype")=="text-br"){$("#CPF").val(dataObj["CPF"]);}
+if((dataObj["CNPJ"]!=undefined)&&$("#CNPJ").attr("subtype")!=undefined&&$("#CNPJ").attr("subtype")=="text-br"){$("#CNPJ").val(dataObj["CNPJ"]);}
+}
+function SwitchMexicoTaxId(cardtype){var $thisTaxID=$("#divTaxID");if($thisTaxID){if(cardtype!=null&&cardtype.toLowerCase()=="sv"){$thisTaxID.prepend(PCS.Views.getViewById("TaxIDForCSV"));$("#TaxIDForCSV").show();$("#TaxIDForOtherPI").hide();}else{$thisTaxID.prepend(PCS.Views.getViewById("TaxIDForOtherPI"));$("#TaxIDForOtherPI").show();$("#TaxIDForCSV").hide();}
+}
+}
+function AccountInfoDisplay(cardtype,category){var payout_pi_types=new Array();payout_pi_types[0]='bap';payout_pi_types[1]='pp';var result=$.inArray(cardtype,payout_pi_types);var isPayOutPI=(result!=-1);if(NeedSelectCountry){SwitchMexicoTaxId(cardtype);$("#pi-extra").show();}else
+{$this=$("#AccountDetailInfo");if(NEED_PI_EXTRA_FOR_PAYIN&&(!isPayOutPI||(isPayOutPI&&!HasPayinAccount))){if($this){$this.append(PCS.Views.getViewById("UserDetailForPayin"));SwitchMexicoTaxId(cardtype);$("#pi-extra").show();}
+}else if(NEED_PI_EXTRA_FOR_PAYOUT&&isPayOutPI){if($this){$this.append(PCS.Views.getViewById("UserDetailForPayout"));}
+$("#pi-extra").show();}
+else{$("#pi-extra").hide();}
+}
+return isPayOutPI;}
+PCS.Cookies=function(){this.Add=function(name,value,expires,path,domain){var cookieStr=name+"="+escape(value);if(expires!=null&&expires!=""){var date=new Date();date.setTime(date.getTime()+expires*24*3600*1000);cookieStr+=";expires="+date.toGMTString();}
+if(path!=null&&path!=""){cookieStr+=";path="+path;}
+if(domain!=null&&domain!=""){cookieStr+=";domain="+domain;}
+document.cookie=cookieStr;}
+this.Remove=function(name){var date=new Date();date.setTime(date.getTime()-10000);document.cookie=name+"=a; expires="+date.toGMTString();}
+this.Get=function(name){var cookieArr=document.cookie.split("; ");for(var i=0;i<cookieArr.length;i++){var temp=cookieArr[i].split("=");if(temp[0]==name){return unescape(temp[1]);}
+}
+return null;}
+};function GetQueryString(name){var reg=new RegExp("(^|&)"+name+"=([^&]*)(&|$)","i");var r=window.location.search.substr(1).match(reg);if(r!=null)return unescape(r[2]);return null;}
+function onStoredValuePISelect(){$("#newsv > div[class='hidden']").hide();$("#btnSave").prop("disabled",!STORED_VALUE_ISENOUGH);}
+function RefreshSaveButtonStatus(responseState){if(responseState=="succeed"){$("#btnSave").prop("disabled",false);}else{$("#btnSave").prop("disabled",true);}
+}
+function ExpiredYearSelect(obj,data,cardtype,category){$this=obj;if(cardtype=="cc"){var findYY=$this.find("option[value='YYYY']");if(findYY.length>0){if($this.find("option:nth-child(2)").val()!=new Date().getFullYear()){$this.find("option:nth-child(2)").remove();}
+if($this.find("option[value='"+data+"']").length==0){findYY.after($("<option></option>").val(data).html(data));}
+}
+}
+}
+function ExpiredYearSelectBam(obj,data){if(obj==null||obj==undefined)return;$this=obj;if($this.children().first().attr('data-value')!=new Date().getFullYear()){$this.children().first().remove();}
+if((data!=null&&data!=undefined)&&$this.find("li[data-value='"+data+"']").length==0){$this.prepend($("<li></li>").attr("data-value",data).html(data).attr("title",data).addClass('hidden').addClass('other'));}
+}
+function RefreshUIOnSelectedPI(cardtype,category,subtype){$("div[class*='reviewandsign']").hide();$("#PIInfoReview").hide();$("#DDReview").hide();$("#PPReview").hide();switch(cardtype){case "cc":
+break;case "dd":
+break;case "pp":
+$("#PIInfoReview").show();$("#PPReview").show();break;case "pppi":
+break;case "bap":
+break;case "inicis":
+break;case "sv":
+onStoredValuePISelect();break;default:
+break;}
+if(cardtype!="sv"){$("#btnSave").prop("disabled",false);}else{$("#btnSave").prop("disabled",!STORED_VALUE_ISENOUGH);}
+ViewMode.Init(ViewMode.ModeType);}
+function CheckParentUrl(parentUrl){if(!(parentUrl=="")){if(window.top==window.self){this.location.href=parentUrl;}
+}
+}
+function AutoFormat(ostring){if(ostring.length){ostring=$.trim(ostring);var formatStr="";for(var i=0;i<ostring.length;){formatStr+=ostring.substring(i,i+5)+'-';i=i+5;}
+formatStr=formatStr.substring(0,formatStr.length-1);formatStr=formatStr.length>29?formatStr.substring(0,29):formatStr;return formatStr;}
+return ostring;}
+function ParseChar(sStr){var zChar=new Array('-',' ');for(i=0;i<zChar.length;i++){var sNewStr="";var iStart=0;var iEnd=sStr.indexOf(zChar[i]);while(iEnd!=-1){sNewStr+=sStr.substring(iStart,iEnd);iStart=iEnd+1;iEnd=sStr.indexOf(zChar[i],iStart);}
+sNewStr+=sStr.substring(sStr.lastIndexOf(zChar[i])+1,sStr.length);sStr=sNewStr;}
+return sStr;}
+function OnPasteFormat(obj,e){var string=$(this).val();var newString=ParseChar(string);if(newString.length){var formated=AutoFormat(newString);setTimeout(function(){$(this).val(formated);},50);}
+}
+function isActiveXSupported(){return(window.ActiveXObject||"ActiveXObject"in window);}
+function prepareNewInicis(){var needAuth=false;if($("#selected-pi-category").val()=='new'&&$("#selected-pi-type").val()=='inicis'){needAuth=true;}
+if(needAuth){var isChrome=navigator.userAgent.indexOf("Chrome")>-1;if(!isActiveXSupported()&&!isChrome){return false;}
+if(!auth()){return false;}
+return true;}
+return true;}
+function ForbiddenInputPaste(idlist){if(idlist.length<=0)return;for(var i=0;i<idlist.length;i++){$(idlist[i]).bind('paste',function(){return false;});}
+}
+function auth(){if(document.INIpay==null||document.INIpay.object==null){return false;}
+else{return MakeAuthMessage(document.forms["PCSBodyForm"]);}
+}
+function onInicisCreditCardTypeSelect(merchantid){$("#acceptmethod").val('BILLAUTH');$("#inicisPayMethodType").val('CreditCard');$("#mid").val(merchantid);}
+function onInicisMobileTypeSelect(merchantid){$("#acceptmethod").val('BILLAUTH(HPP):HPP(1)');$("#inicisPayMethodType").val('Mobile');$("#mid").val(merchantid);}
+PCS.generateFingerPrintScript=function(sessionGuid){var fptHostDomain="microsoft.com";var validFptHostDomains=["live-int.com","live.com","microsoft-int.com","microsoft.com"];var pcsHostNameParts=document.location.hostname.split(".");if(pcsHostNameParts.length>2){pcsHostNameParts.splice(0,pcsHostNameParts.length-2);var hostDomain=pcsHostNameParts.join(".");if($.inArray(hostDomain,validFptHostDomains)>-1){fptHostDomain=hostDomain;}
+}
+$("#FingerPrintInframe").html("<iframe src='https://fpt."+fptHostDomain+"/tags?session_id="+sessionGuid+"' height='0' width='0' tabindex='-1' style='border:0px';></iframe>");}
+function PCSRedirectionNotify(){var pmData=eval("("+POST_MESSAGE_MODEL_JSON+")");if(pmData!=null||pmData!=undefined){if(pmData.ispostmessage.toLowerCase()=="false"){var listenerUrl=pmData.listenerurl;if(listenerUrl!=null&&listenerUrl!=""){sendInfoToListener('redirection',listenerUrl);}
+}
+else{if(pmData.method=="pcs_onredirectionnotify"){PCS.PostMessage.SendMessage(JSON.stringify(pmData),pmData.host);}
+}
+}
+}
+function SubscriptionAgreement(isenable){if(!isenable){return;}
+$("#subAgreement").click(function(){if($(this).is(':checked')){$("#SubAgreementDiv").removeClass("subagreement-select");}else{$("#SubAgreementDiv").addClass("subagreement-select");}
+});}
+function CheckSubscriptionAgreement(){var subID="subAgreement";if($("#"+subID).length<=0){return true;}
+if($("#"+subID).is(':checked')){return true;}else{$("#SubAgreementDiv").addClass("subagreement-select");return false;}
+}
+function ACHAuthAgreement(isenable){if(!isenable){return;}
+$("#ACHAuthAgreement").click(function(){if($(this).is(':checked')){$("#subAgreementACH").removeClass("subagreement-select");}else{$("#subAgreementACH").addClass("subagreement-select");}
+});}
+function CheckACHAuthAgreement(){var subID="ACHAuthAgreement";if($("#"+subID).length<=0){return true;}
+if($("#"+subID).is(':checked')){return true;}else{$("#subAgreementACH").addClass("subagreement-select");return false;}
+}
+function CleanUpCreditCardNumber(){if(HYPHENS_AND_SPACES_ALLOWED_IN_CREDIT_CARD_NUMBER
+&&$("#creditCardNumber").length){$("#creditCardNumber").val(GetCreditCardNumberWithoutHyphensAndSpaces());}
+}
+function GetCreditCardNumberWithoutHyphensAndSpaces(){if($("#creditCardNumber").length){var creditCardNumber=$("#creditCardNumber").val();return creditCardNumber.replace(/-| /g,"");}
+}
+function ReadyValidate(){jQuery.validator.addMethod(
+"pattern",
+function(value,element,regexp){if(regexp=="^$"||regexp==''){return true;}
+return this.optional(element)||new RegExp(regexp,'g').test(value);},
+"Invalid input."
+);jQuery.validator.addMethod(
+'ValidateLocationAddress',
+function(value,element,param){var address1=$.trim($('#billingAddress1').val());var address2=$.trim($('#billingAddress2').val());var address3=$.trim($('#billingAddress3').val());var district=$.trim($('#billingDistrict').val());var addressLength=address1.length+address2.length+address3.length+district.length;if($('#bankAccountPayHolderName')[0]){if($('#bankAccountPayHolderName').val().length>0){var result=addressLength<=33;if(!result){$('#billingAddress1').addClass("input-err");$('#billingAddress2').addClass("input-err");$('#billingAddress3').addClass("input-err");$('#billingDistrict').addClass("input-err");}else{$('#billingAddress1').removeClass("input-err");$('#billingAddress2').removeClass("input-err");$('#billingAddress3').removeClass("input-err");$('#billingDistrict').removeClass("input-err");}
+return result;}
+}
+else{return true;}
+return true;},
+"Location address is too long."
+);jQuery.validator.addMethod(
+'ValidateBankLocationAddress',
+function(value,element,param){var address1=$.trim($('#bapBranchLocationAddress1').val());var address2=$.trim($('#bapBranchLocationAddress2').val());var address3=$.trim($('#bapBranchLocationAddress3').val());var addressLength=address1.length+address2.length+address3.length;if($('#bankAccountPayBankName')[0]){if($('#bankAccountPayBankName').val().length>0){var result=(addressLength<=35);if(!result){$('#bapBranchLocationAddress1').addClass("input-err");$('#bapBranchLocationAddress2').addClass("input-err");$('#bapBranchLocationAddress3').addClass("input-err");}else{$('#bapBranchLocationAddress1').removeClass("input-err");$('#bapBranchLocationAddress2').removeClass("input-err");$('#bapBranchLocationAddress3').removeClass("input-err");}
+return result;}
+}
+else{return true;}
+return true;},
+"Bank address is too long."
+);jQuery.validator.addMethod(
+'CheckBuyerNameCombined',
+function(value,element,param){var firstName=$.trim($('#inicisPayBuyerFirstName').val());var lastName=$.trim($('#inicisPayBuyerLastName').val());var buyerName=firstName+lastName;return buyerName.length<=30;},
+"First Name + Last Name should not exceed 30 characters."
+);jQuery.validator.addMethod(
+'PrepaidCardNumbersCheck',
+function(value,element,param){var strlen=$("#PrepaidCardNumber").val().length 
+var errorMsgID="PrepaidCardNumbersCheckMessage";if(strlen==29||strlen==0){$("#"+errorMsgID).remove();return true;}
+return false;},
+"You must enter 25 character prepaid card number."
+);jQuery.validator.addMethod(
+'CheckBuyerTelephoneCombined',
+function(value,element,param){var prefixValue=$.trim($('#inicisPayBuyerTelephonePhonePrefix').val());var numberValue=$.trim($('#inicisPayBuyerTelephonePhoneNumber').val());return(prefixValue.length>0&&numberValue.length>0)||(prefixValue.length==0&&numberValue.length==0);},
+"You need input Telephone Prefix and Number if you want to fill telephone information."
+);jQuery.validator.addMethod(
+'myEqual',
+function(value,element,param){var target=$(param).unbind(".validate-equalTo").bind("blur.validate-equalTo",function(){$(element).valid();});return value==target.val();},
+"You must enter the same number as the account number to confirm."
+);jQuery.validator.addMethod(
+'CheckPrefixPhoneNumberCombined',
+function(value,element,param){var prefix=$.trim($("#billingPhonePrefix").val());var number=$.trim($("#billingPhoneNumber").val());var wholePhoneNumber=prefix+number;return wholePhoneNumber.length==10;},
+"10 digits are required for the phone prefix and number. Check that you have entered them correctly."
+);jQuery.validator.addMethod(
+'CVVCheck',
+function(value,element,param){var type=null;var amex='^[0-9]{4}$';var others='^[0-9]{3}$';type=GetCardTypeFromField(param);if(type=="AMEX"){if(!value.match(amex)){return false;}
+}
+else{if(!value.match(others)){return false;}
+}
+return true;},
+"The CVV number does not match to the credit card type, please check it."
+);jQuery.validator.addMethod(
+'IsCreditCardExpire',
+function(value,element,param){var month=$.trim($('#creditCardExpireMonth').val());var year=$.trim($('#creditCardExpireYear').val());if(month==''||year==''){return true;}else{var currentDate=new Date();var currentYear=currentDate.getFullYear();var currentMonth=currentDate.getMonth()+1;if(year<currentYear){return false;}
+if(year==currentYear&&month<currentMonth){return false;}
+}
+try{RemoveCCExpiredMsg();}
+catch(e){}
+return true;},
+"Your credit card has expired. Please update the expiration date."
+);jQuery.validator.addMethod(
+'IsBirthday',
+function(value,element,param){var month=$.trim($('#monthOfBirthday').val());var year=$.trim($('#yearOfBirthday').val());var day=$.trim($('#dayOfBirthday').val());if(year==''||month==''||day==''){return true;}else{month=month-1;var birthday=new Date(year,month,day);if(!(birthday&&birthday.getFullYear()>0)){return false;}
+if(birthday.getFullYear()!=year
+||birthday.getMonth()!=month
+||birthday.getDate()!=day){return false;}
+}
+return true;},
+"Birthday is invalid."
+);jQuery.validator.addMethod(
+'IsNumberMatchedCardType',
+function(value,element,param){if(typeof(CREDIT_CARD_TYPE_DISPLAY_MODE)=='undefined'){return true;}
+if(CREDIT_CARD_TYPE_DISPLAY_MODE.toLocaleLowerCase()=="imagelist"){if(CREDIT_CARD_TYPE_IMAGELIST_DISPLAY_TYPE.toLocaleLowerCase()=="hidden"){$('#CreditCardTypeList input:radio[name="creditCardType"]').parent().show();}else{$('#CreditCardTypeList input:radio[name="creditCardType"]').each(function(){$(this).next("img").attr("src",$(this).next("img").attr("normalsrc"));});}
+}
+var ccSubTypes={"CARTEBANCAIRE":'^((497039[0-9]{10})|(497111[5|6][0-9]{9})|(497112[5|9][0-9]{9})|(497120[2|9][0-9]{9})|(497146[5|6][0-9]{9})|(4971599[0-9]{9})|(4971605[0-9]{9})|(497161[5|6][0-9]{9})|(4971750[0-9]{9})|(4971751[0-2][0-9]{8})|(49717549[0-9]{8})|(497302[0-9][0-6][0-9]{8})|(497302976506[0-9]{4})|(49730297650[7-9][0-9]{4})|(4973029[7|8][6-9][5-9][1-9][0-9]{5})|(49730299[0-9]{8})|(497303[0-9]{10})|(497308[0-9]{10})|(4973992[0-9]{9})|(497404[0-9]{10})|(497510[0-9]{10})|(49751550[1|2][0-9]{7})|(49751[6|9]5[0-9]{9})|(4975265[0-9]{9})|(49753[5|6|8|9]5[0-9]{9})|(49754[6|7|9]5[0-9]{9})|(49755[6|7|8]5[0-9]{9})|(49756[6|7|8]5[0-9]{9})|(49757[0|6|8|9][0-9]{10})|(49758[0|1|5]5[0-9]{9})|(497585[7|5][0-9]{9})|(49759[2|3|5|6|8|9]5[0-9]{9})|(4976550[6|7][0-9]{8})|(4976985[0-9]{9})|(507595[0-9]{10})|(513308[2|3][0-9]{9})|(513308[5-9][0-9]{9})|(527429[0-9]{10})|(560408[0-9]{10})|(56124102[0-9]{9})|(5612411[0|2|3|7][0-9]{9})|(5612412[0|2|3|5|9][0-9]{8})|(5612413[1|3|5|6|9][0-9]{8})|(5612414[4|5|7|8][0-9]{8})|(5612416[0|1|6|7|8|9][0-9]{8})|(5612417[1|2|8|9][0-9]{8})|(5612418[1|2|3|7]{8})|(5612419[4|5|8][0-9]{8})|(56125402[0-9]{8})|(5612541[0|2|3|7][0-9]{8})|(5612542[0|2|3|4|5|9][0-9]{8})|(5612543[1|3|5|6|9][0-9]{8})|(5612544[0|4|5|7|8][0-9]{8})|(5612546[0|1|6|7|8|9][0-9]{8})|(5612547[1|2|8|9][0-9]{8})|(5612548[1|2|3|7][0-9]{8})|(5612549[1|4|5|8|9][0-9]{8})|(58170[0|1|3|4|5|6|8][0-9]{10})|(581709[0-9]{10})|(58171[0-3][0-9]{10})|(58171[4|6-8][0-9]{10})|(581719[0-9]{10})|(581720[0-9]{10})|(58172[2|3|5-9][0-9]{10})|(58173[0|2-5][0-9]{10})|(58175[2|3|4][0-9]{10})|(58175[7-9][0-9]{10})|(581760[0-9]{10})|(58176[1|3-5|7|8][0-9]{10})|(58177[0|1|2|4-7][0-9]{10})|(581779[0-9]{10})|(58178[0-2][0-9]{10})|(58178[3|5|8|9][0-9]{10})|(58179[2|3|5|6|8|9][0-9]{10})|(58540[2-5][0-9]{10})|(58550[1|2-5][0-9]{10})|(585569[0-9]{10})|(58557[7-9][0-9]{10})|(58558[0-2][0-9]{10})|(675146[0-9]{10}))',
+"ELECTRON":'(^(400102|400115|400136|400162|400163|400168|400170|400174|400176|400178|400182|400184|400185|400187|400191|400199|400208|400273|400282|400288|400311|400312|400316|400317|400318|400320|400321|400322|400324|400325|400326|400327|400328|400330|400331|400332|400333|400334|400335|404659|404674|404716|404730|404757|404762|404767|404786|404800|404834|404836|404858|404859|404866|404868|404879|404881|404893|404904|404917|404919|404925|404932|404936|404987|404990|405030|405050|405051|405066|405090|405200|405209|405233|405234|405236|405238|405239|409613|409614|409618|409625|409626|409630|409631|409635|409643|409682|409683|409689|409690|409691|409692|409693|409714|409718|409727|409738|409752|409765|409776|409783|409789|409851|409861|409866|409873|409878|409888|409913|409936|414297|414301|414339|414340|414387|414393|414565|414613|414620|414641|414642|414646|414658|414668|414674|414696|414699|419908|419955|419997|420012|420172|420173|420176|420316|420317|420330|420343|420347|420368|420375|420381|420384|420546|420555|420564|420572|420583|425179|425184|425194|425303|425306|425321|425322|425503|425520|425528|425537|425552|425563|425595|425596|425603|425604|425609|425680|425692|425699|430102|430114|430149|430219|430241|430256|430272|430282|430359|430375|430379|430444|430494|430510|430520|430541|430545|430565|430579|430581|430583|435162|435501|435506|435612|435629|435698|435700|435708|440776|440795|440799|440822|441004|441014|441020|441045|441075|441076|441091|441118|441267|441312|441313|441329|441338|441339|441346|441347|445895|445965|445988|445993|446006|446116|446117|446118|446142|446144|446165|446193|446255|446290|446374|446380|446385|446388|446505|446515|450905|451095|451096|451110|451134|451174|451198|451213|451324|451368|451412|451419|451485|455968|456062|456076|456098|456133|456143|456147|456157|456162|456169|456172|456190|456191|456209|456213|456214|456215|456216|456221|456227|456230|456231|456232|456233|456234|456235|456236|456237|456238|456239|456240|456241|456242|456243|456245|456246|456248|456249|456250|456254|456263|456265|456266|456268|456283|456284|456285|461750|461751|461752|461945|461989|461994|462022|467018|467094|467106|467474|467562|472427|472428|472447|472455|472458|472466|472495|472532|472533|472538|472539|472545|472546|472551|472556|472557|472567|472568|472575|472579|472620|472663|472664|472665|472666|472675|472829|472837|472843|472853|472854|472856|472857|472860|472862|472870|472886|472895|472903|472947|478711|478716|478719|478735|478738|478747|478768|478770|478774|478778|478784|478796|479001|479018|479023|479033|479042|479053|479056|479057|479067|479068|479075|479077|479079|479082|479083|479086|479091|479186|479189|484632|484657|484674|484675|484676|484677|484679|484681|484683|484684|484685|484686|484687|484688|484693|484701|484707|484713|484755|484767|484774|484780|484788|484789|484797|402790|402791|402839|402881|402903|402911|402921|402924|402948|402956|402963|402972|402976|402978|402985|402994|402998|403007|403025|403026|403027|403028|403029|403030|403031|403032|403035|403051|403093|403184|403188|403257|403267|403319|403326|403332|403349|403350|407859|408049|408057|408073|408089|408145|408146|408200|408205|408215|408233|408247|412474|412477|412500|412511|412512|412516|412531|412534|412545|412548|412560|412564|412572|412582|412587|412603|412673|412722|412742|412921|412922|412923|412989|413047|413051|417318|417325|417329|417357|417362|417369|417374|417377|417383|417387|417409|417426|417431|417434|417436|417441|417445|417447|417459|417465|417469|417473|417478|417481|417486|417489|417501|417503|417504|417506|417507|417508|417509|417512|417513|417514|417517|417518|417520|417521|417522|417523|417526|417527|417529|417530|417532|417533|417534|417535|417536|417538|417539|417541|417542|417543|417544|417546|417547|417548|417550|417551|417552|417554|417555|417556|417559|417560|417561|417562|417564|417565|417566|417568|417569|417570|417571|417573|417575|417576|417577|417578|417580|417581|417582|417583|417584|417585|417586|417587|417588|417589|417590|417593|417595|417597|417598|417600|417601|417602|417603|417616|417618|417621|417630|417633|417648|417660|417663|417687|417712|417714|417716|417746|417749|417751|417754|417770|417779|417862|417868|417876|417918|422591|422597|422605|422614|422642|422680|422682|422684|422800|422802|422805|422807|422808|422809|422871|422975|427680|427681|427682|427683|427684|427685|427686|427687|427688|427689|427691|427812|427817|427820|427821|427825|427827|427833|427835|427846|427851|427859|427863|427865|427870|427872|427873|427875|427876|427877|427884|427885|428007|428052|428061|428118|428120|428123|428126|428157|428164|428176|428182|428187|432559|432566|432573|432610|432678|432703|432786|432788|432877|432914|432917|432918|432919|432920|432927|432930|432931|432932|432933|432936|432937|432949|432974|433001|433002|433007|433019|433033|438099|438101|438131|438150|438163|438233|438253|438257|438266|438316|438387|438696|443200|443223|443233|443271|443305|443309|454314|454322|454351|454352|454354|454355|454475|454616|454630|454635|454637|454656|454662|459333|459357|459408|459421|459434|459449|459465|459472|459510|459524|459533|459554|459806|459967|459978|459981|459985|459988|459994|460018|465472|465492|465545|465549|465557|465560|465566|465574|465578|465722|465731|465752|465802|465824|465828|465895|465964|465994|471222|471230|471255|471290|471334|471339|471344|471374|471376|471377|471412|471421|471427|471432|471441|471442|471444|471445|471446|471450|471468|471475|476619|476620|476662|476664|476665|476831|476847|476867|476872|476951|477060|477107|477130|477147|482407|482418|482428|482463|482481|483005|483007|483008|488945|488965|488967|489038|489058|494606|494609|403381|403387|403396|403398|403498|403500|403520|403524|403549|403569|403617|403641|403662|403677|403685|403688|403691|403698|403740|403830|403837|403838|403842|403845|403853|403863|403866|403867|403875|403877|403881|403888|403891|403898|403899|408310|408316|408323|408324|408328|408341|408343|408345|408350|408356|408357|408364|408383|408400|408413|408417|408447|408460|408469|408473|408506|408574|408581|408593|408854|408855|413087|413095|413098|413130|413131|413133|413134|413141|413143|413150|413183|413205|413210|413217|413223|413225|413251|413263|413276|413277|413284|413286|413288|413297|413388|413414|413418|413423|413560|418117|418120|418121|418129|418334|418337|418341|418354|418364|418367|418382|418389|418398|423249|423296|423309|423623|423700|423741|423803|423808|423826|423833|423838|423846|428223|428225|428226|428228|428246|428249|428257|428272|428282|428287|428345|428523|428537|428551|428555|428573|428579|428607|428617|428624|428639|428670|428674|428694|433241|433242|433262|433263|433304|433307|433313|433326|433327|433333|433364|433367|433373|433390|433391|433424|433454|433466|433468|433514|433543|433595|433621|433670|433698|438725|438930|438932|438982|438985|439025|439030|439034|439056|439058|439059|439066|439070|439077|439128|439129|439146|439147|439223|439228|439245|439267|439357|439358|439371|439377|439378|443851|443872|443874|443888|443907|443921|443924|443927|443958|443962|444000|444003|444022|444034|444038|444039|444040|444041|444048|444088|444236|444244|444245|444248|444445|444448|444463|444468|444519|449319|449349|449389|453904|453924|453947|453961|453974|453988|458479|458523|458543|458563|458580|458732|458759|458770|458771|458787|458823|458828|458838|458846|458847|458853|458867|458870|459003|459017|459041|459046|459053|459056|459068|464117|464149|464163|464426|464452|464594|464615|464620|464624|464640|464641|464654|464657|464660|464663|470356|470373|470376|470452|470468|470478|470489|470498|470553|470554|470637|470649|470662|470679|470911|470940|476086|476206|476285|476292|476294|476332|481516|481517|481887|481888|481889|481890|482102|482103|482137|487412|487417|487423|487454|487461|493805|494005|494010|494022|494046|494054|494090|494119|494121|494331|494399|404006|404101|404102|404123|404140|404169|404190|404191|404197|404199|404215|404216|404241|404244|404264|404269|404275|404282|404292|404296|404303|404311|404315|404322|404353|404367|404368|404373|404386|404520|404530|404590|408970|408973|409017|409037|409050|409054|409080|409100|409314|409317|409327|409347|409358|409365|409380|409384|409386|413727|413745|413749|413756|413793|413838|413842|413856|413860|413879|413885|414018|414049|414053|414056|414071|414076|414084|414086|414088|414099|418609|418712|418718|418726|418730|418754|418767|418782|418785|418803|418811|418820|418829|418834|418848|418851|418873|418886|418893|418908|418975|418982|419137|419138|419139|419140|419141|419142|419143|419144|419145|419146|419152|419158|419172|419185|419190|419196|419211|419236|423896|423916|423949|424104|424114|424176|424206|424232|424277|424282|424310|424311|424314|424321|424325|424334|424343|424345|424354|424358|424368|424382|424404|424410|424423|424439|424451|424454|424467|424472|424475|424484|424492|424503|424509|424519|428919|428950|428957|428960|428994|429009|429027|429039|429041|429048|429052|429054|429058|429059|429090|429158|429343|429357|429383|429431|429441|429452|433801|433813|433825|433829|433836|433867|433958|433962|434141|434148|434156|434175|434204|434339|434354|434384|439467|439987|440128|440131|440135|444660|444661|444662|444663|444664|444667|444668|444669|444670|444674|444680|444684|444804|444953|445006|445007|445029|445037|445068|445069|445112|445125|445132|445141|445168|449728|449744|449932|450010|450038|450042|450046|450047|450077|450088|450236|454663|454685|454696|454703|454874|454875|455012|455036|455060|455234|455244|455250|455256|460044|460063|460068|460075|460096|460186|460187|460346|464831|464838|464847|464971|465205|465208|465217|465222|465223|465226|465243|465274|465275|469609|469614|469651|469759|469762|469813|469864|469879|469885|475163|475170|475182|475184|475764|475789|480947|480949|481213|486820|487002|487006|487016|487029|487033|487034|487036|487052|487059|487072|487077|487078|487080|487098|492401|492402|492403|492404|492405|492439|492460|492487|499803|499821|499835|499887|402327|402360|402361|402365|402366|402379|402412|402427|402430|402525|402528|402534|402544|402557|402586|402593|402625|402633|402639|402657|402668|402670|402679|402684|402698|402729|402733|402746|402753|402754|402766|402771|402772|402773|402774|407127|407234|407318|407343|407357|407366|407374|407379|407380|407381|407390|411834|411879|411925|411926|411929|411938|411950|411951|411955|411960|411966|411970|411973|411981|411991|412043|412284|412432|412434|416702|416706|416743|416755|416758|416772|416792|416813|416843|416880|416914|416916|416924|416953|416960|416965|416974|416976|416979|416984|417007|417054|417056|417059|417082|417213|417221|417223|417227|417230|417252|417276|417278|417284|417316|417317|422169|422228|422351|422433|422484|422495|427224|427237|427265|427272|427286|431917|432036|432039|432045|432053|432059|432104|432164|432171|432201|432227|432229|432232|432259|432260|432261|432280|432336|432339|432407|432411|432416|432422|432434|432440|432479|432484|432489|432496|432498|432529|437446|437473|437474|437480|437484|437486|437513|437538|437541|437561|437566|437569|437576|437708|437711|437740|437777|437851|437860|437863|437875|437886|447815|447837|447850|447857|447872|447888|448176|448308|448316|448342|448346|448360|448366|448382|448384|453148|453149|453200|457217|457246|457247|457248|457258|457266|457285|457316|457336|457372|457391|457409|457412|457428|457439|457467|457517|457565|457656|457662|457668|457669|457732|457745|457749|457782|457787|462811|462812|462813|462940|462941|462965|462969|462970|462983|462991|462992|462993|463188|463219|463316|463460|468508|468539|468593|468736|468755|468756|468763|468797|468805|468817|468822|468917|468918|468928|468950|468959|474529|474580|474837|474853|474879|486023|486027|486061|486067|486072|486073|486079|486085|486090|486340|486342|486387|486388|491726|491731|491734|491735|491736|491740|491746|491754|491755|491758|491767|491770|491771|491780|491801|491805|491825|491827|491837|491839|491843|491844|491846|491847|491850|491971|492010|492020|492030|492040|492047|492048|492057|492080|492115|498514|498522|498534|498588|498628|498747|498799|498805|498832|498848|400495|400629|400735|400819|400827|400837|400838|400839|400843|400881|405243|405253|405258|405266|405267|405268|405269|405270|405271|405272|405273|405274|405275|405277|405278|405281|405315|405382|405427|405430|405441|405457|405465|405474|405475|405477|405513|405534|405601|405614|405615|405634|405635|405638|405642|405651|405656|405669|405670|405671|405675|405678|405704|405709|405749|405750|405755|405773|405774|405775|405776|405777|405778|405825|405832|410101|410131|410140|410170|410176|410177|410211|410231|410238|410247|410306|410326|410331|410340|410352|410359|410360|410362|410385|410520|410536|410540|410560|410586|410587|410614|410615|410618|410619|410622|410642|410647|410652|410654|410659|410662|410666|410668|410685|414938|414941|414953|415007|415009|415014|415019|415025|415033|415042|415159|415184|415185|415193|415195|415231|415238|415254|415257|415313|419240|419244|419252|419257|419265|419266|419267|419268|419279|419291|419317|419326|419328|419329|419335|419357|419360|419366|419377|419391|419394|419418|419518|419526|419568|419575|419581|419617|419634|419651|419652|419656|419673|419675|419689|419701|419707|419740|419741|419754|419773|419774|419775|419799|419813|419828|419831|419835|419837|419838|419839|419845|419854|419860|419872|419886|424534|424540|424544|424555|424558|424559|424563|424565|424612|424656|424661|424666|424705|424706|424732|424947|424950|424970|424976|424982|425134|429508|429514|429525|429526|429529|429557|429683|429701|429724|429733|429742|429746|429775|429920|429923|429926|429929|429938|429942|429960|429967|434486|434606|434682|440205|440231|440255|440257|440277|440282|440285|440292|440295|440501|440505|440509|440512|440515|440533|440541|440547|440558|440564|440566|440571|440573|440577|440584|440586|440588|440589|440601|440602|440606|440621|440626|440634|440644|440647|440660|440665|440673|440685|440690|440698|440753|440761|445196|445412|445417|445431|445435|445454|445486|445529|445550|445551|445574|445585|445586|445619|445625|445629|450286|450340|450412|450416|450484|450496|450500|450778|450827|450845|450850|450853|455294|455309|455364|455365|455370|455371|455533|455537|455579|455646|455660|455679|455683|455684|455721|455751|455758|455773|455775|455787|461167|461200|461211|461249|461260|461272|461273|461274|461275|461297|466038|466049|466056|466066|466258|466265|466284|466526|466708|466720|472209|472218|472240|472246|472249|472286|472416|472422|472423|472424|472425|477170|477191|477192|477201|477282|477386|477393|477395|477501|477572|477598|477703|477705|483045|483046|483047|483051|483470|483517|483747|483775|483845|489743|489912|489930|490119|490133|490156|490222|490223|490254|490279|496016|496021|496043|496073|496090|484801|484807|484818|484821|484840|484845|484865|484868|484878|484898|485012|485067|491248|491250|491268|491342|491365|491511|491566|491567|491580|491602|491603|491614|491651|491671|491672|491691|491692|491693|491694|497622|497623|497624|497628|497630|497632|497634|497636|497644|497648|497654|497656|497657|497658|497659|497660|497661|497665|497672|497682|497697|497784|497806|497831|497973|497981|498004|495053|401151|401152|401677|401680|401713|405834|405835|405836|405837|405838|405839|405846|405848|405852|405857|405860|405864|405872|405933|405934|406034|406117|406143|406170|406176|406182|406219|406224|406229|406236|406238|406245|406248|406261|406270|406277|406278|406279|406308|406358|406375|406382|406386|406404|406427|406435|406437|410687|410694|410736|410737|410741|410743|410744|410746|410748|410762|410766|410773|410786|410789|410790|410830|411098|411182|411188|415405|415416|415432|415450|415462|415464|415512|415515|415684|415703|415925|415934|415955|415960|415963|420585|420588|420598|420709|420771|420780|420792|420793|420794|420795|420796|420797|420959|421003|421067|421086|421101|421102|421117|421124|421154|421171|421174|421179|421188|421304|426508|426511|426514|426732|426736|426737|426743|426760|426802|426817|426839|426844|426846|426847|426850|426853|426858|426861|426865|426868|426869|426870|426871|426884|426885|426889|431312|431315|431318|431332|431355|431356|431358|431361|431363|431374|431379|431402|431404|431405|431499|431508|431573|431693|431820|431830|431834|431841|431844|431875|431897|431905|431908|436754|436759|442172|442384|442434|447349|447351|447366|447370|447374|447398|447502|447503|447504|447505|447513|447514|447521|447522|447523|447524|447525|447526|447527|447528|447529|447568|447571|447582|447584|447607|447764|447807|452204|452205|457792|457836|457847|457862|457881|457892|457936|457948|457982|458041|458042|458116|458137|458173|458179|458202|458203|458205|458238|458445|458464|458469|458473|463612|463644|463743|469184|469185|469231|469233|469234|469289|469298|469342|469367|469384|469568|473707|473835|473887|474127|474128|474143|474145|474156|474157|474200|479238|479260|479296|479329|479409|479702|479709|479710|479711|479714|479731|479734|479772|479793|479903|485430|485491|490450|490453|490808|490822|490825|490907|490929|490941|490957|490980|490982|490985|490986|490991|490993|490998|491000|491005|491057|491058|491079|491089|497049|497073|497115|497116|497117|497118|497120|497132|497170|497173|497200|497235|497245|497257|497258|497280|497290|497309|497318|497324|497329|497335|497336|497342|497360|497385|497393|497397|497410|497453|497459|497461|497462|497466|497470|497477|401727|401738|401750|401751|401760|401764|401773|401803|401805|401814|401815|401836|401856|401919|402002|402008|402027|402040|402068|402090|402115|402127|402134|402135|402151|402156|402157|402170|402171|402179|402192|402263|402265|402274|402279|402284|406455|406460|406473|406602|406603|406605|406606|406608|406609|406611|406612|406614|406615|406617|406618|406652|406660|406670|406708|406710|406726|406744|406750|406759|406766|406772|406776|406779|406790|406895|406899|406902|406924|406930|406940|406975|406991|411299|411419|411556|411608|411624|411628|411640|411645|411649|411652|411657|411660|411674|411676|411699|411706|411707|411708|411713|411717|411721|411747|411753|411782|411785|411796|411810|415972|416012|416020|416038|416039|416081|416084|416214|416249|416329|416443|416451|416492|416496|416639|416674|421353|421513|421633|421634|421651|421773|425823|425849|426038|426049|426053|426058|426069|426070|426071|426072|426082|426124|426142|426147|426150|426161|426204|426254|426288|426289|426309|426317|426345|426351|426358|430879|430929|430967|431021|431029|431085|431087|431091|431110|431187|431188|431197|431206|431262|435769|441508|441522|446670|446846|446878|446880|446913|446939|446943|446946|446958|446961|446981|447062|451497|451712|451768|451770|451773|456716|456817|456819|456841|456842|456885|456886|456905|457024|462225|462238|462252|462278|462499|462523|462550|462706|462708|462710|462720|462730|462736|462744|462753|462765|462768|462775|462776|462780|462784|467724|467738|467758|467762|467788|467797|467813|467852|467853|467907|467941|468208|473109|473119|473160|473189|473227|473265|473299|477915|477931|477935|477957|477974|477985|477992|478265|478471|478474|483860|483980|484167|484186|484197|484406|484407|484411|484419|484420|484422|484426|484431|484432|484441|489092|489095|489245|489301|489322|489335|489368|489385|489403|489428|489441|489452|489460|489461|489462|489463|489464|489474|489481|493198|493428|493437|493474|493540|493590|493591|493592|493594|493595|499904)[0-9]{10})$',
+"ELO":'^(636297|504175|438935|636368|451416)[0-9]{10}$',
+"VISA":'^4(?:[0-9]{12}|[0-9]{15})$',
+"MC":'^(?:5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}$',
+"AMEX":'^3[47][0-9]{13}$',
+"DISCOVER":'^6(?:011|4[4-9][0-9]|5[0-9]{2})[0-9]{12}|62[4-6][0-9]{13}|628[2-8][0-9]{12}|622(1(2[6-9]|[3-9][0-9])|[2-8][0-9]{2}|9([01][0-9]|2[0-5]))[0-9]{10}|3(?:0[0-5]|[689][0-9])[0-9]{11}|3095[0-9]{10}$',
+"DINERS":'^3(?:0[0-5]|[689][0-9])[0-9]{11}|3095[0-9]{10}$',
+"JCB":'^(?:3[0-9]{15}|(2131|1800)[0-9]{11})$'
+};var cctype=null;var ccnumber=$("#creditCardNumber").val();if(HYPHENS_AND_SPACES_ALLOWED_IN_CREDIT_CARD_NUMBER
+&&$("#creditCardNumber").length){ccnumber=GetCreditCardNumberWithoutHyphensAndSpaces();}
+if(ccnumber==''||ccnumber==null){return true;}
+for(var type in ccSubTypes){if($.inArray(type,SUPPORTED_CREDITCARD_TYPE)!=-1&&ccnumber.match(ccSubTypes[type]))
+{cctype=type;break;}
+}
+var result=$.inArray(cctype,SUPPORTED_CREDITCARD_TYPE);if(cctype==null||result==-1){return false;}else{var $this=$("#creditCardType");function CheckErrMsg(){var ccTypeErrorMsg=$("label.error[for=creditCardType]");if(ccTypeErrorMsg.length>0&&ccTypeErrorMsg.css("display")=="inline"){ccTypeErrorMsg.hide();}
+}
+if($this.is(":radio")){$('input:radio[name="creditCardType"][value="'+cctype+'"]').prop('checked',true);$('input:radio[name="creditCardType"]').first().removeClass("error");CheckErrMsg();}
+else{if(!(($('#creditCardType').val()==="DISCOVER"&cctype==="JCB")||($('#creditCardType').val()==="JCB"&cctype==="DISCOVER"))){$("#creditCardType option[value ="+cctype+"]").attr("selected","selected");$("#creditCardType").removeClass("error");CheckErrMsg();}
+}
+if(CREDIT_CARD_TYPE_DISPLAY_MODE.toLocaleLowerCase()=="imagelist"){if(CREDIT_CARD_TYPE_IMAGELIST_DISPLAY_TYPE.toLocaleLowerCase()=="hidden"){$('#CreditCardTypeList input:radio[name="creditCardType"][value!="'+cctype+'"]').parent().hide();$('#CreditCardTypeList input:radio[name="creditCardType"][value="'+cctype+'"]:first').parent().show();}else{$('#CreditCardTypeList input:radio[name="creditCardType"][value!="'+cctype+'"]').each(function(){$(this).next("img").attr("src",$(this).next("img").attr("graysrc"));});$('#CreditCardTypeList input:radio[name="creditCardType"][value="'+cctype+'"]').each(function(){$(this).next("img").attr("src",$(this).next("img").attr("normalsrc"));});}
+}
+return true;}
+},
+"Credit card number and credit card type does not match, please check it."
+);jQuery.validator.addMethod(
+'PICVCheck',
+function(value,element,param){var list=$('input[id^="Picv"][type="text"]');var isListNull=true;if(list==null||list.length==0){throw new exception("Cannot find PICV textbox.");}
+for(i=0;i<list.length;i++){if(list[i].value!=null&&jQuery.trim(list[i].value)!=""){isListNull=false;break;}
+}
+if(isListNull){return false;}else{return true;}
+},
+"At least one of the two fields is required."
+);jQuery.validator.addMethod(
+'NonCCNumberSuspicious',
+function(value,element,param){return notCCNumberSuspicious(value);},
+"Invalid input."
+);function notCCNumberSuspicious(value){if(typeof(PCSSuspiciousCCBinRange)==="undefined"||PCSSuspiciousCCBinRange==''){return true;}
+return!(new RegExp(PCSSuspiciousCCBinRange,'g').test(value));}
+}
+function ReadyTooltip(){$("#WhatsThis, #WhatsThisEdit").tooltip({position:"bottom left",
+offset:[3,100],
+effect:"toggle",
+opacity:1.0,
+layout:""
+}).each(function(i){if(this.href){$(this).data('href',this.href).addClass('link');$(this).click(function(){$(this).attr('href',$(this).data('href'));});}
+});$("#WhatsThisForPobo").tooltip({position:"bottom center",
+offset:[3,100],
+effect:"toggle",
+opacity:1.0,
+layout:""
+}).each(function(i){if(this.href){$(this).data('href',this.href).addClass('link');$(this).click(function(){$(this).attr('href',$(this).data('href'));});}
+});}
+function GetParameterValue(qString,parameter){if(qString=='')return;var keyValPairs=[];var params={};var queryString=qString.substr(qString.indexOf('?')+1);if(queryString.length){keyValPairs=queryString.split('&');for(pairIndex in keyValPairs){var key=keyValPairs[pairIndex].split('=')[0];if(!key.length)continue;if(typeof params[key]==='undefined'){params[key]=[];}
+params[key].push(keyValPairs[pairIndex].split('=')[1]);}
+return params[parameter];}else
+{return;}
+}
+function ZipcodeChange(){var market=$('#market').val().toLowerCase();if(market=="br"){var zipcodeVal=$(this).val();if((zipcodeVal.length==8)&&(/^\d+$/.test(zipcodeVal))){var newZipcode=zipcodeVal.substr(0,5)+"-"+zipcodeVal.substr(5,3);$(this).val(newZipcode);}
+}
+}
+function SelectCountryChanage(){var newMKT=$(this).val();if(newMKT=="")return;var url=window.location.href;if(Entry_Url!=undefined&&Entry_Url!=null&&Entry_Url.length>0){url=Entry_Url;}
+var lowerUrl=url.toLowerCase();var needHandleAccountIDAndPIID=$('#NeedHandleAccountIDAndPIID').val();if(lowerUrl.indexOf("?mkt=")==-1
+&&lowerUrl.indexOf("&mkt=")==-1){if(url.indexOf("?")==-1){url=url+"?mkt="+newMKT;}else{url=url+"&mkt="+newMKT;}
+}else{var re=/[\?|\&][mM][kK][tT]=([a-zA-Z]{2,3}\-[a-zA-Z]{2,4})(\-[a-zA-Z]{2})?/g;if(lowerUrl.indexOf("&mkt=")>=0){url=url.replace(re,"&mkt="+newMKT);}
+if(lowerUrl.indexOf("?mkt=")>=0){url=url.replace(re,"?mkt="+newMKT);}
+}
+if(needHandleAccountIDAndPIID.toLowerCase()=='true'
+&&lowerUrl.indexOf("addmkt=")==-1){var oldMkt=GetParameterValue(lowerUrl,"mkt");if(oldMkt==undefined||oldMkt=="")oldMkt="en-us";if(url.indexOf("?")==-1){url=url+"?addmkt="+oldMkt;}else{url=url+"&addmkt="+oldMkt;}
+}
+window.location.href=url;}
+function SelectUserTypeChange()
+{var userType=$(this).val();$this=$("#AccountDetailInfoPobo");if($this.length){PCS.Views.putAccountTypeViews();if(userType.toLowerCase()=="business"){$this.append(PCS.Views.getViewById("BusinessUserDetail"));$("#bankRadioPayCNPJID").trigger("click");}else
+{$this.append(PCS.Views.getViewById("PersonalUserDetail"));}
+InputHint.HintInit(INPUT_HINT_LIST);}
+}
+function DisplaySubmitLoading(location){var animation=$('#loading_animation').html();switch(location){case "center":
+{$("#LoadingDiv").append(animation);var winWidth=$(document).width();var winHeight=$(window).height();var topPoint=(winHeight-$("#LoadingDiv").height())/2;var leftPoint=(winWidth-$("#LoadingDiv").width())/2;$("#ShadeDiv").width($(document).width());$("#ShadeDiv").height($(document).height());$("#ShadeDiv").show();$("#LoadingDiv").css("top",topPoint+"px");$("#LoadingDiv").css("left",leftPoint+"px");$("#LoadingDiv").show();document.documentElement.scrollTop=0;break;}
+case "button":
+{var displaybtn=$("#Buttons").html();$("#Buttons").html(animation+displaybtn);break;}
+case "buttonText":
+{var text=$('#loading_text').html();$("#Buttons").html(animation+text);break;}
+case "none":
+default:
+return;}
+}
+function ReadyText(supportAccessibility){if(supportAccessibility){$(".accessibilityread").bind("mouseover",function(){$(this).focus();}).bind("mouseout",function(){$(this).blur();});}
+}
+function ReorderTabindex(){try{if(typeof DISABLE_TAB_INDEX_ID_LIST!='undefined'){DisableTab(DISABLE_TAB_INDEX_ID_LIST);}
+if($('div.buttonsFocusReorder').length<=0&&(typeof ORDERED_TAB_INDEX_ID_LIST=='undefined'||ORDERED_TAB_INDEX_ID_LIST.length<=0)){return;}
+var tabIndexCounter=0;var allCanFocusedElements=new Array();$("a, body, button, frame, iframe, img, input, isIndex, object, select, textArea").not(":hidden").each(function(){if($(this).attr("tabindex")>=0){allCanFocusedElements.push($(this));}
+});if(typeof ORDERED_TAB_INDEX_ID_LIST!='undefined'&&ORDERED_TAB_INDEX_ID_LIST.length>=0){allCanFocusedElements=CreateReorderedList(allCanFocusedElements,ORDERED_TAB_INDEX_ID_LIST);}
+$.each(allCanFocusedElements,function(){$(this).attr("tabindex",++tabIndexCounter);});if($('div.buttonsFocusReorder').length>0){var tabindexOfSaveButton=$("#btnSave").attr("tabindex");var tabindexOfCancelButton=$("#btnReset").attr("tabindex");var tabIndexTmp=0;if(tabindexOfSaveButton!=null&&tabindexOfCancelButton!=null&&tabindexOfSaveButton>tabindexOfCancelButton){tabIndexTmp=tabindexOfSaveButton;$("#btnSave").attr("tabindex",tabindexOfCancelButton);$("#btnReset").attr("tabindex",tabIndexTmp);}
+}
+}catch(err){}
+}
+function CreateReorderedList(sourceList,orderedTabIds){if(!sourceList||!orderedTabIds){return sourceList;}
+var sourceIdSetObjectMap={};$.each(sourceList,function(){var myId=this.attr('id');if(!!myId&&myId!=""){sourceIdSetObjectMap[myId]=this;}
+});var newOrderedTabIds=[];$.each(orderedTabIds,function(){if(this in sourceIdSetObjectMap){newOrderedTabIds.push(this.toString());}
+})
+if(newOrderedTabIds.length==0){return sourceList;}
+var newObjectList=[];var matchedIdMap={};var topOfOrderedList=0;$.each(sourceList,function(){var myId=this.attr('id');if(!myId||myId==""){newObjectList.push(this);return;}
+if(myId in matchedIdMap){newObjectList.push(matchedIdMap[myId]);return;}
+if($.inArray(myId,newOrderedTabIds)>=0){var topObj=sourceIdSetObjectMap[newOrderedTabIds[topOfOrderedList++]];matchedIdMap[myId]=topObj;newObjectList.push(topObj);return;}
+newObjectList.push(this);return;});return newObjectList;}
+function DisableTab(tabIdList){if(!tabIdList||tabIdList.length==0){return;}
+$.each(tabIdList,function(){$('#'+this).attr('tabindex',-1);})
+}
+$(document).ready(function(){ReadyValidate();ReadyTooltip();$(window).resize(function(){setTimeout('if (Popup.ISShow) Popup.Show("PopupConsent", "ShadeDiv");',200);});$("input[name='creditCardType']:radio").click(PCS.CCTypeClick);$("#creditCardType").change(PCS.CCTypeClick);$("#Buttons input").bind({mousedown:function(){$(this).addClass("click");},
+mouseup:function(){$(this).removeClass("click");}
+});$("#selectCountry").bind("change",SelectCountryChanage);$("#billingZipcode").on("change",ZipcodeChange);$(PCS.EditableFieldSeletor).live('change',OnFieldEdit);$(PCS.EditableFieldSeletor).live('keyup',OnFieldEdit);$('#bankAccountPayNumberConfirm,#directDebitNumberConfirm,#payPalEmailConfirm').on('cut copy paste',function(e){e.preventDefault();});$this=$("#AccountDetailInfoPobo");if($this.length){PCS.Views.putAccountTypeViews();if($("#usertype option:selected").val()=="PERSONAL"){$this.append(PCS.Views.getViewById("PersonalUserDetail"));}else{$this.append(PCS.Views.getViewById("BusinessUserDetail"));}
+$("#pi-extra").show();}
+$("#usertype").live("change",SelectUserTypeChange);setTimeout("ReorderTabindex()",200);$("div#tooltip.tooltip").css({"margin-left":"0px"});try{$('#PIList input[name=pcs_spiid]:visible').live("keydown",function(e){if($('#PIInfo input[name=pcs_spiid]:visible').length>0&&!e.shiftKey&&e.keyCode==9){$('#PIInfo input[name=pcs_spiid]:visible').first().focus();e.returnValue=false;if(e.preventDefault)e.preventDefault();}
+});}catch(err){}
+PCS.PostMessage.NotifyOnPageLoad();if(typeof LogEvent!=='undefined'){var correlationId=$('#correlationId').val()
+var sessionGuid=$('#sessionGuid').val();var market=$('#market').val();var partner=$('#partner').val();var subpartner=$('#subpartner').val();var validationResultMessage=$('#ValidationResultMessage');if(validationResultMessage.length>0){var errorCode=$('#errorCode');if(errorCode.length>0){var errorCode=errorCode.val();LogEvent({"EventName":"Error","CorrelationId":correlationId,"SessionGuid":sessionGuid,"ErrorCode":errorCode,"Market":market,"Partner":partner,"SubPartner":subpartner});}else{LogEvent({"EventName":"Error","CorrelationId":correlationId,"SessionGuid":sessionGuid,"ErrorCode":"","Market":market,"Partner":partner,"SubPartner":subpartner});}
+}
+}
+});window.onload=function(){try{var paymentMethod=$('.payment-method');var piCardInputField=$('#pi-card :input:not(input[type=hidden])');var inputField=$('#mainContent :input:not(input[type=hidden])');if(paymentMethod!=null&&paymentMethod.length>0
+&&(window.getComputedStyle?window.getComputedStyle(paymentMethod[0],null).display:paymentMethod[0].currentStyle.display)=="none"){if(piCardInputField.length>0){piCardInputField[0].focus();}
+}
+else{if(inputField.length>0){inputField[0].focus();}
+}
+}catch(err){}
+setTimeout("PageHeightChangeNotice();",200);if(typeof LogEvent!='undefined'){var correlationId=$('#correlationId').val();var sessionGuid=$('#sessionGuid').val();var market=$('#market').val();var partner=$('#partner').val();var subpartner=$('#subpartner').val();setTimeout(function(){LogEvent({"EventName":"PageLoad","CorrelationId":correlationId,"SessionGuid":sessionGuid,"Market":market,"Partner":partner,"SubPartner":subpartner})
+},0);}
+}
+window.onbeforeunload=function(){try{if(typeof LogEvent!='undefined'){var pageUnloadInitiator=$('#pageUnloadInitiator').val();var correlationId=$('#correlationId').val();var sessionGuid=$('#sessionGuid').val();var market=$('#market').val();var partner=$('#partner').val();var subpartner=$('#subpartner').val();setTimeout(function(){LogEvent({"EventName":"Unload","CorrelationId":correlationId,"SessionGuid":sessionGuid,"Market":market,"Partner":partner,"SubPartner":subpartner,"PageUnloadInitiator":pageUnloadInitiator});},0);$('#pageUnloadInitiator').val("");}
+}
+catch(err){}
+}
+function findGroupByID(groups,id){if(groups==null||id==null){return null;}
+for(var key in groups){if(id.indexOf(key)>=0){return groups[key];}
+}
+return null;}
+function setFieldChangedFlag(fieldName){try{if(!fieldName){return;}
+var field=$('#'+fieldName);if(field.length<=0){return;}
+if(field.val().toLowerCase()==='true'){return;}
+field.val(fieldsChanged());}
+catch(err){}
+}
+function fieldsChanged(){var updatedFields=findUpdatedFields('change');return updatedFields&&!IsEmptyObject(updatedFields);}
+function findUpdatedFields(queryType){var spiid=$('[name="pcs_spiid"]:checked');var sourceData;var updatedFields={};var groups={'creditCardExpire':['creditCardExpireMonth','creditCardExpireYear'],
+'billingPhone':['billingPhonePrefix','billingPhoneNumber'],
+'Birthday':['monthOfBirthday','dayOfBirthday','yearOfBirthday']
+};if(spiid==null||spiid.length==0){sourceData=PCS.Profile;}else if(spiid.attr('cardtype')!=""&&spiid.val().indexOf('$new')==-1){sourceData=PCS.Cards[spiid.attr('cardtype')][spiid.val()];$('#updatedFieldsUpdate').show();}else if(spiid.val().indexOf('$new')!=-1){$(PCS.EditableFieldSeletor).each(function(){if($(this).val()!=''&&!$(this).is('[readonly="true"]')){var id=$(this).attr('id');var fieldName=$('#'+id).parents('div.cell').find('h4');if(fieldName==null||fieldName.length==0){fieldName="";}else{fieldName=fieldName.text();}
+var groupIDs=findGroupByID(groups,id);if(groupIDs!=null&&groupIDs.length>0){var groupStr="";for(var key in groupIDs){var val=getTextByOptionValue(groupIDs[key]);if(val!=null){if(groupStr==""){groupStr+=val;}else{groupStr+="-"+val;}
+}
+}
+if(updatedFields[fieldName]==null)
+updatedFields[fieldName]=['',groupStr];}else if(fieldName!=""){if($(this).is(":radio")&&$(this).attr('title')!=""){updatedFields[fieldName]=['',getTextByOptionValue(id,$(this).attr('title')),id];}else{updatedFields[fieldName]=['',getTextByOptionValue(id,$(this).val()),id];}
+}
+else if($(this).attr('subtype')!=null&&$(this).attr('subtype')=='text-br'){var cpfAndcnpjType=$('#'+id).parents('div.cell').find('span input[type="radio"]:checked').attr('title');if(cpfAndcnpjType!=undefined&&cpfAndcnpjType!='')
+updatedFields[cpfAndcnpjType]=['',getTextByOptionValue(id,$(this).val()),id];}
+}
+});$('#updatedFieldsAdd').show();return updatedFields;}else{}
+if(sourceData!=null){for(var id in sourceData){if(sourceData.hasOwnProperty(id)&&sourceData[id]!=null){var newData=$('input#'+id+', select#'+id+', textarea#'+id).val();var fieldName=$('#'+id).parents('div.cell').find('h4');var radioObj=$("input[type='radio'][name='"+id+"']:checked");if(radioObj!=undefined&&radioObj.length>0)
+{newData=radioObj.val();fieldName=radioObj.parents('div.cell').find('h4');}
+if(queryType.toLowerCase()==='all'||
+(queryType.toLowerCase()==='change'&&newData!=undefined&&newData!=sourceData[id])){var obj=new Object();if(fieldName==null||fieldName.length==0){fieldName="";}else{fieldName=fieldName.text();}
+var groupIDs=findGroupByID(groups,id);if(groupIDs!=null&&groupIDs.length>0){var oldGroupStr="";var newGroupStr="";for(var key in groupIDs){var origVal=getTextByOptionValue(groupIDs[key],sourceData[groupIDs[key]]);var val=getTextByOptionValue(groupIDs[key]);if(origVal!=null&&val!=null){if(newGroupStr==""&&oldGroupStr==""){oldGroupStr+=origVal;newGroupStr+=val;}else{oldGroupStr+="-"+origVal;newGroupStr+="-"+val;}
+}
+}
+if(updatedFields[fieldName]==null){updatedFields[fieldName]=[oldGroupStr,newGroupStr]
+}
+}else{var oldText=getTextByOptionValue(id,sourceData[id]);newData=getTextByOptionValue(id,newData);if(radioObj!=undefined&&radioObj.length>0){oldText=$("input[type='radio'][value='"+sourceData[id]+"']").attr('title');newData=radioObj.attr('title');}
+updatedFields[fieldName]=[oldText,newData,id]
+}
+}
+}
+}
+}
+return updatedFields;}
+function getTextByOptionValue(id,data){if(data==null)
+data=$('input#'+id+', select#'+id).val();if(id==null||id==''||data==null||data=='')
+return data;if(id.toLowerCase()=="billingstate"&&$('ul#BillingState')!=null&&$('ul#BillingState').length>0){if($('div[id$="PITypeStates"]:visible').length>0){return $('div[id$="PITypeStates"]:visible').find('ul#BillingState li[data-value="'+data+'"]').text();}else{return $('ul#BillingState li[data-value="'+data+'"]').text();}
+}else if($('ul#'+id)!=null&&$('ul#'+id).length>0){return $('ul#'+id+' li[data-value="'+data+'"]').text();}else if($('select#'+id)!=null&&$('select#'+id).length>0){return $('#'+id+' option[value="'+data+'"]').text();}else{return data;}
+}
+function objectHasProperty(obj){if(obj!=null){for(var key in obj){if(obj.hasOwnProperty(key))
+return true;}
+}
+return false;}
+function showSubmitConfirmation(form,isAnonymous){if(isAnonymous){$('#PageContainer').hide();$('#submitConfirmation').show();}else{var list=findUpdatedFields('Change');showDetailTitleAndAddContent(list);$('#PageContainer').hide();$('#submitConfirmation').show();}
+PageHeightChangeNotice();}
+function showDetailTitleAndAddContent(list)
+{var str="";var size=0;if($('[name="pcs_spiid"]:checked').length>0&&$('[name="pcs_spiid"]:checked').val().indexOf('$new')!=-1){for(var fieldName in list){str=str.concat('<tr><td class="width-oleft">'+fieldName+'</td>'+'<td class="width-ocenter">'+list[fieldName][0]+'</td>'+'<td class="width-oright">'+list[fieldName][1]+'</td></tr>');size++;}
+$("#detail-title").hide();}
+else{for(var fieldName in list){str=str.concat('<tr><td class="width-tleft">'+fieldName+'</td>'+'<td class="width-tcenter">'+list[fieldName][0]+'</td>'+'<td class="width-tright">'+list[fieldName][1]+'</td></tr>');size++;}
+$("#detail-title").show();}
+if(size==0){str=str.concat('<tr><td colspan="3"><span class="noUpdatedField">'+noInformation+'</span></td></tr>');}
+$('#updatedFieldsTable').find('tbody').append(str);}
+function submitConfirmationConfirmed(){isConfirmed=true;$('#mainContent').find('form').submit();}
+function submitConfirmationCanceled(isAnonymous){$('#mainContent').find('#PageContainer').show();$('#updatedFieldsTable').find('tbody').html('');$('#updatedFieldsAdd').hide();$('#updatedFieldsUpdate').hide();$('#submitConfirmation').hide();PageHeightChangeNotice();}
+function submitForm(form){DisplaySubmitLoading(LOADING_GIF_LOCATION);$('#Buttons').find('input[id^="btn"]').each(function(){setTimeout("$('#"+$(this).attr('id')+"').prop('disabled', true);",100);});if(!$("#btnSave").is(":disabled")){$('#pageUnloadInitiator').val("submitForm");if(typeof LogEvent!='undefined'){LogEvent({"EventName":"FormSubmit","CorrelationId":$('#correlationId').val(),"SessionGuid":$('#sessionGuid').val(),"Market":$('#telemetry_market').val(),"Partner":$('#partner').val(),"SubPartner":$('#subpartner').val()});}
+$("body").css("cursor","wait");form.submit();}
+}
+function PageHeightChangeNotice(height){if(!POST_MESSAGE_MODEL_JSON){return;}
+var pmData=eval("("+POST_MESSAGE_MODEL_JSON+")");var pageHeight=height==null?$(document.body).height():height;var realHeight=0;var popup=$('#PopupConsent');var popupHeight=0;if(popup!=null&&popup.length>0){popupHeight=$('#PopupConsent').height();if(popupHeight==0&&pageHeight==0){return;}
+popupHeight=popupHeight+5;realHeight=(pageHeight>=popupHeight)?pageHeight:popupHeight;}
+else
+{if(pageHeight==0){return;}
+realHeight=pageHeight;}
+if(pmData!=null||pmData!=undefined){if(pmData.ispostmessage.toLowerCase()=="false"){var listenerUrl=pmData.listenerurl;if(listenerUrl!=null&&listenerUrl!=""){var errorCode=pmData.errorcode;var clientHeight=realHeight;if($.browser.mozilla){clientHeight+=15;}
+if(errorCode!=null){sendInfoToListener('sendPageLoadedAndHeight',listenerUrl,[clientHeight,errorCode]);}
+else{sendInfoToListener('sendPageLoadedAndHeight',listenerUrl,[clientHeight]);}
+}
+}
+else{if(pmData.method=="pcs_onheightchange"){pmData.height=realHeight;PCSSender.SendMessage(JSON.stringify(pmData),pmData.host);}
+}
+}
+}
+function GetCardTypeFromField(id){var fields=$(id);if(!fields||fields.length==0){return null;}
+for(var index=0;index<fields.length;++index){var field=$('#'+fields[index].id);if(field.is(":radio")){field=$("input[name='creditCardType']:checked");}
+var type=field.val();if(!!type&&type!=""){return type;}
+}
+return null;}
+function OnPageDisplayedCallback(pageManager){if(pageManager==null){return;}
+if($('#ValidationResultMessage').length==0){return;}
+if(pageManager.CurrentPageIndex==pageManager.defaultPageIndex()
+||pageManager.getCurrentPage().contains('.input-err')){$('#ValidationResultMessage').show();}
+else{$('#ValidationResultMessage').hide();}
+}
+function _DoCancelCore(){var cancelURL=$("#cancelURL");if(cancelURL!=null&&cancelURL!=undefined){var url=$("#cancelURL").val();window.location.href=url;}else{throw{message:"The cancel url isn't exists."};}
+}
+$(function(){if(typeof(PageManager)!='undefined'&&typeof(paginationConfig)!='undefined'&&paginationConfig.length>0){PCS.PageManager=new PageManager(paginationConfig,'.input-err',OnPageDisplayedCallback);}
+$('#btnPrevous').click(function(){if(!PCS.PageManager){if(typeof(_DoCancelCore)!='undefined'){_DoCancelCore();}
+return;}
+PCS.PageManager.previous();if(typeof(PageHeightChangeNotice)!='undefine'){PageHeightChangeNotice();}
+});})
+function ApplyWin10ClassName(){if(typeof(DynamicCSSJSON2Win10)==='undefined'){throw{message:"DynamicThemeDisabled in function ApplyWin10ClassName."};return;}
+try{var dynamicCSSDict=JSON.parse(DynamicCSSJSON2Win10);}catch(e){return null;}
+$.each(dynamicCSSDict,function(key,val){if(key==undefined||key==null){return;}
+$(''+key+'').attr('class',val);});var css=".text-title img, .text-subtitle img{display:none;}"+
+"input[type='checkbox'],input[type='radio']{margin-right:2px;}";ApplyAdditionalCSS(css);var whatsThis=$('#WhatsThis');if(whatsThis.length>0){var whatsThisApi=whatsThis.data("tooltip");if(whatsThisApi){var conf=whatsThisApi.getConf();conf.relative=true;conf.position=['top','left'];}
+}
+$('#privacyString').click(function(){document.location=this.href;return false;});return;}
+function ApplyAdditionalCSS(css){var wrapper="<style type='text/css'>"+css+"</style>";$('#additionalCss').html(wrapper);}

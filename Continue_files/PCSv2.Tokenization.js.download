@@ -1,0 +1,33 @@
+// Copyright (c) 2006 Microsoft Corporation
+var pcsTokenizer=function(){var tokenizeSuccessCount=0;var tokenizeFailureCount=0;var tokenizeFieldCount=0;function computeTokenFieldId(name){return name+"Token";}
+function addTokenizedElement(fieldId,pcsForm){var tokenFieldId=computeTokenFieldId(fieldId);var origElement=document.getElementById(fieldId);var exist=document.getElementById(tokenFieldId);if(exist)
+return;var input=document.createElement("input");input.type="hidden";input.name=origElement.name;input.id=tokenFieldId;input.value="";pcsForm.appendChild(input);}
+function tokenizationErrorEvent(errorCode,errorDetails){var correlationId=$("#correlationId").val();var sessionGuid=$("#sessionGuid").val();var market=$("#market").val();var partner=$("#partner").val();var subpartner=$("#subpartner").val();var data={"EventName":"Error","CorrelationId":correlationId,"SessionGuid":sessionGuid,"ErrorCode":errorCode,"ErrorDetails":errorDetails,"Market":market,"Partner":partner,"SubPartner":subpartner};LogEvent(data);}
+function tokenize(fieldId,valType,val,onTokenizeSuccess,onTokenizeFailure,tokenizationUrl){var tokenFieldId=computeTokenFieldId(fieldId);var tokenElem=document.getElementById(tokenFieldId);var tokUrl=tokenizationUrl+valType+"/getToken";var headers={};var payload='{ data: "'+val+'"}';pcsAjaxHelper.post(true,tokUrl,headers,payload,function(resultData,textStatus,jqxhr){tokenElem.value="TOK#"+resultData.data;tokenizeSuccessCount++;if(tokenizeFieldCount==tokenizeSuccessCount){onTokenizeSuccess();}else if(tokenizeFieldCount==tokenizeSuccessCount+tokenizeFailureCount){onTokenizeFailure();}
+},function(jqxhr,localFailureMessage){var msg="Tokenization Server Communication error, HTTP Method: "+localFailureMessage.httpMethod+
+" URL : "+localFailureMessage.url+
+" Retries : "+localFailureMessage.retryAttempt+
+" Message: "+localFailureMessage.errorMessage;console.error(msg);tokenizationErrorEvent("32100",msg);tokenizeFailureCount++;if(tokenizeFieldCount==tokenizeSuccessCount+tokenizeFailureCount){onTokenizeFailure();}
+});};function onTokenizeSuccess(tokenizeDeferred){tokenizeDeferred.resolve();};function onTokenizeFailure(pciFields,tokenizeDeferred){for(var i=0;i<pciFields.length;i++){if(pciFields[i].pciElem){pciFields[i].pciElem.disabled=false;}
+}
+tokenizeDeferred.reject();};var pcsTokenizer={canTokenize:function(){return "withCredentials"in new XMLHttpRequest();},
+tokenizeFields:function(pciFields,pcsForm,tokenizationUrl){tokenizeSuccessCount=0;tokenizeFailureCount=0;tokenizeFieldCount=0;var tokenizeDeferred=$.Deferred();for(var i=0;i<pciFields.length;i++){var pciElem=document.getElementById(pciFields[i].fieldId);if(pciElem){tokenizeFieldCount++;pciElem.disabled=true;addTokenizedElement(pciFields[i].fieldId,pcsForm);pciFields[i].pciElem=pciElem;}
+}
+console.log("pcsTokenizer.tokenize(), tokenizeFieldCount: "+tokenizeFieldCount);if(tokenizeFieldCount==0){tokenizeDeferred.resolve();return tokenizeDeferred.promise();}
+for(var i=0;i<pciFields.length;i++){if(pciFields[i].pciElem){tokenize(pciFields[i].fieldId,pciFields[i].fieldType,pciFields[i].pciElem.value,
+function(){onTokenizeSuccess(tokenizeDeferred);},
+function(){onTokenizeFailure(pciFields,tokenizeDeferred);},
+tokenizationUrl);}
+}
+return tokenizeDeferred.promise();}
+};return pcsTokenizer;}();var pcsAjaxHelper=function(){var maxRetryAttempts=3;var initialRetryTimeout=1000;var retryTimeoutMultiplier=2;function successHandler(deferred,onSuccess){return function(data,textStatus,jqxhr){if(onSuccess){onSuccess(data,textStatus,jqxhr);}
+deferred.resolve(data,textStatus,jqxhr);}
+};function failureHandler(deferred,settings,onSuccess,onError,retries){return function(jqxhr,textStatus,error){var failureInfo=handleAjaxFailure(jqxhr,textStatus,error);var localFailureMessage=failureInfo||{};localFailureMessage.httpMethod=settings.type;localFailureMessage.url=settings.url;localFailureMessage.retryAttempt=retries;var retryable=failureInfo.retryable;if(retryable&&retries>=0&&retries<maxRetryAttempts){setTimeout(function(){var jQueryAjaxPromise=$.ajax(settings);jQueryAjaxPromise.then(successHandler(deferred,onSuccess),failureHandler(deferred,settings,onSuccess,onError,retries+1));},initialRetryTimeout*Math.pow(retryTimeoutMultiplier,retries));}else{if(onError){onError(jqxhr,localFailureMessage);}
+}
+};};function handleAjaxFailure(jqxhr,textStatus){var msg;var retryable=false;if(jqxhr.status===0){msg="Network connection failed";retryable=true;}else if(jqxhr.status==404){msg="Requested page not found [404].";}else if(jqxhr.status==500){msg="Internal Server Error [500].\n"+jqxhr.responseText;}else if(textStatus==="parsererror"){msg="Requested JSON parse failed.";}else if(textStatus==="timeout"){msg="Time out error.";retryable=true;}else if(textStatus==="abort"){msg="Ajax request aborted.";retryable=true;}else{msg="Uncaught Error.\n"+jqxhr.responseText;}
+return{errorMessage:msg,
+retryable:retryable
+};}
+function invokeAjax(retry,httpMethod,url,headers,payload,onSuccess,onError){var settings={};settings.type=httpMethod;settings.url=url;settings.headers=headers;settings.dataType="json";settings.data=payload;settings.contentType="application/json";var jQueryAjaxPromise=$.ajax(settings);var deferred=$.Deferred();var retries=retry?0:-1;jQueryAjaxPromise.then(successHandler(deferred,onSuccess),failureHandler(deferred,settings,onSuccess,onError,retries));return deferred.promise();}
+var ajaxHelper={post:function(retry,url,headers,payload,onSuccess,onError){return invokeAjax(retry,"POST",url,headers,payload,onSuccess,onError);}
+};return ajaxHelper;}();

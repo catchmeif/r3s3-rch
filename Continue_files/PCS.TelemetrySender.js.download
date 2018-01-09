@@ -1,0 +1,171 @@
+if (typeof GetQueryString === 'undefined') {
+    function GetQueryString(name) {
+        var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
+        var r = window.location.search.substr(1).match(reg);
+        if (r != null) return unescape(r[2]);
+
+        return null;
+    }
+}
+
+function CreateBaseContent(data) {
+    var paths = document.location.pathname.split('/');
+    var partner = (paths.length > 2)? paths[2] : "";
+    var auth = (paths.length > 3) ? paths[3] : "";
+    var action = (paths.length > 1) ? paths[paths.length - 1] : "";
+    var trackingId = GetQueryString('trackingId');
+    var verificationToken = (document.getElementsByName("__RequestVerificationToken"))
+    if (verificationToken.length > 0) {
+        verificationToken = verificationToken[0].value;
+    } else {
+        verificationToken = "";
+    }
+
+    var PCSEvent = {
+        "Version":"1.1",
+        "CorrelationId": data.CorrelationId,
+        "SessionGuid": data.SessionGuid,
+        "Partner": partner,
+        "SubPartner" : data.SubPartner,
+        "Market": data.Market,
+        "BrowserString": navigator.userAgent,
+        "Authentication": auth,
+        "Action": action,
+        "TrackingId": trackingId,
+        "VerificationToken": verificationToken
+    };
+
+    return PCSEvent;
+}
+
+function CreateEventContent(eventObject, data) {
+    eventObject.EventName = data.EventName;
+    eventObject.EventCode = data.EventCode;
+}
+
+function CreatePageLoadContent(eventObject, data) {
+    var t = performance.timing;
+    eventObject.LatencyMS = (t.loadEventEnd - t.navigationStart);
+    eventObject.EventCode = data.EventCode;
+}
+
+function CreateErrorContent(errorObject, data) {
+    errorObject.ErrorCode = data.ErrorCode;
+    if (data.ErrorDetails)
+        errorObject.ErrorDetails = data.ErrorDetails;
+}
+
+function CreateRedirectContent(eventObject, data) {
+    eventObject.RedirectUrl = data.RedirectUrl;
+    eventObject.Type = data.Type;
+}
+
+function CreateSuccessContent(eventObject, data) {
+    eventObject.RedirectUrl = data.RedirectUrl;
+}
+
+function CreateFailContent(eventObject, data) {
+    eventObject.RedirectUrl = data.RedirectUrl;
+    eventObject.ErrorCode = data.ErrorCode;
+}
+
+function CreatePageUnloadContent(eventObject, data) {
+    eventObject.PageUnloadInitiator = data.PageUnloadInitiator;
+}
+
+function removeQueryParam(str) {
+    if (typeof str !== 'undefined') {
+        var urlparts = str.split('%3F');
+        if (urlparts.length >= 1) {
+            str = urlparts[0];
+        }
+    }
+    return str;
+}
+
+function GetEventPrefix() {
+    var prefix = "Microsoft.Commerce.PCS.";
+    var hostUrl = window.location["host"];
+ 
+    if (hostUrl.indexOf("int") > -1) {
+        prefix += "Int";
+    }
+    else {
+        prefix += "Prod";
+    }
+
+    return prefix;
+}
+
+function CreateEvent(data) {
+    var theEvent = { "content": {} };
+    var eventContent = CreateBaseContent(data);
+    var name = data.EventName.toLowerCase();
+    switch (name) {
+        case "error":
+            theEvent.name = GetEventPrefix() + ".Error";
+            CreateErrorContent(eventContent, data);
+            break;
+        case "pageload":
+            theEvent.name = GetEventPrefix() + ".PageLoad";
+            CreatePageLoadContent(eventContent, data);
+            break;
+        case "redirect":
+            theEvent.name = GetEventPrefix() + ".Redirect";
+            CreateRedirectContent(eventContent, data);
+            break;
+        case "success":
+            theEvent.name = GetEventPrefix() + ".Success";
+            CreateSuccessContent(eventContent, data);
+            break;
+        case "fail":
+            theEvent.name = GetEventPrefix() + ".Fail";
+            CreateFailContent(eventContent, data);
+            break;
+        case "unload":
+            theEvent.name = GetEventPrefix() + ".Unload";
+            CreatePageUnloadContent(eventContent, data);
+            break;
+        default:
+            theEvent.name = GetEventPrefix() + ".Event";
+            CreateEventContent(eventContent, data);
+            break;
+    }
+    theEvent.content[theEvent.name] = eventContent;
+    return theEvent;
+}
+
+var resultType = {
+    PCS_onSuccess: "Success",
+    PCS_onError: "Fail"
+};
+
+function LogEvent(data) {
+    if (isCORsReady()) {
+        data.CallerName = window.location.pathname;
+        var thisEvent = CreateEvent(data);
+        window.Asimov.writeEvent(thisEvent);
+    }
+}
+
+// Type can is the resultType defined above (PCS_onSuccess or PCS_onError)
+function logEventType(data) {
+    var type = data.Type;
+    var correlationId = data.CorrelationId;
+    var sessionGuid = data.SessionGuid;
+    var redirectUrl = data.RedirectUrl;
+    var errorCode = data.ErrorCode;
+    var market = data.Market;
+    var subpartner = data.SubPartner;
+    var logType = resultType[type];
+    redirectUrl = removeQueryParam(redirectUrl);
+    if (typeof logType !== 'undefined') {
+        LogEvent({ "EventName": logType, "CorrelationId": correlationId, "SessionGuid": sessionGuid, "RedirectUrl": redirectUrl, "ErrorCode": errorCode, "Market": market, "SubPartner": subpartner });
+    } else {
+        LogEvent({ "EventName": "Redirect", "CorrelationId": correlationId, "SessionGuid": sessionGuid, "RedirectUrl": redirectUrl, "ErrorCode": errorCode, "Type": type, "Market": market, "SubPartner": subpartner });
+    }
+}
+
+function isCORsReady() {
+    return 'withCredentials' in new XMLHttpRequest();
+}
